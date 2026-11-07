@@ -3,6 +3,7 @@
 # Dashboard: http://localhost:8080      API: http://localhost:5000/api/products
 services:
   db:
+    restart: unless-stopped
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: inventory
@@ -17,6 +18,7 @@ services:
       retries: 10
 
   backend:
+    restart: unless-stopped
     build: ./backend
     image: inventory-backend:local
     environment:
@@ -30,6 +32,7 @@ services:
         condition: service_healthy
 
   frontend:
+    restart: unless-stopped
     build: ./frontend
     image: inventory-frontend:local
     environment:

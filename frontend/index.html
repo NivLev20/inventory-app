@@ -1,119 +1,13 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Smart Retail Inventory</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-</head>
-<body>
-  <header class="topbar">
-    <div class="brand">
-      <span class="logo" aria-hidden="true">▣</span>
-      <div>
-        <h1>Smart Retail Inventory</h1>
-        <p class="sub">Stock levels across all stores</p>
-      </div>
-    </div>
-    <div class="topbar-right">
-      <span id="api-status" class="api-status">Checking API…</span>
-      <button id="btn-add" class="btn primary">+ Add product</button>
-    </div>
-  </header>
-
-  <main>
-    <section class="kpis">
-      <div class="kpi"><span class="kpi-label">Products</span><span class="kpi-value" id="kpi-products">–</span></div>
-      <div class="kpi"><span class="kpi-label">Units in stock</span><span class="kpi-value" id="kpi-units">–</span></div>
-      <div class="kpi"><span class="kpi-label">Inventory value</span><span class="kpi-value" id="kpi-value">–</span></div>
-      <div class="kpi alert"><span class="kpi-label">Need restock</span><span class="kpi-value" id="kpi-alerts">–</span></div>
-    </section>
-
-    <section class="grid-2">
-      <div class="card">
-        <h2>Total stock – last 14 days</h2>
-        <div class="chart-box"><canvas id="chart-trend"></canvas></div>
-      </div>
-      <div class="card">
-        <h2>Units restocked per day</h2>
-        <div class="chart-box"><canvas id="chart-restocks"></canvas></div>
-      </div>
-    </section>
-
-    <section class="card" id="low-card">
-      <h2>⚠ Needs restocking</h2>
-      <div id="low-list" class="low-list"></div>
-    </section>
-
-    <section class="card">
-      <div class="card-head">
-        <h2>All products</h2>
-        <div class="filters">
-          <select id="filter-store" aria-label="Filter by store"><option value="">All stores</option></select>
-          <select id="filter-status" aria-label="Filter by status">
-            <option value="">All statuses</option>
-            <option value="OK">OK</option>
-            <option value="LOW">Low</option>
-            <option value="OUT">Out of stock</option>
-          </select>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>Product</th><th>SKU</th><th>Store</th><th>Category</th>
-                <th class="num">Stock</th><th class="num">Min</th><th>Status</th><th></th></tr>
-          </thead>
-          <tbody id="products-body"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>Recent restocks</h2>
-      <ul id="restock-list" class="restock-list"></ul>
-    </section>
-  </main>
-
-  <!-- Add product dialog -->
-  <dialog id="dlg-add">
-    <form id="form-add" method="dialog">
-      <h2>Add product</h2>
-      <label>Name <input name="name" required></label>
-      <label>SKU <input name="sku" required></label>
-      <div class="row">
-        <label>Store <input name="store" value="Tel Aviv"></label>
-        <label>Category <input name="category" value="General"></label>
-      </div>
-      <div class="row">
-        <label>Stock <input name="stock" type="number" min="0" value="0"></label>
-        <label>Min stock <input name="min_stock" type="number" min="0" value="10"></label>
-        <label>Price <input name="price" type="number" min="0" step="0.01" value="0"></label>
-      </div>
-      <p class="form-error" id="add-error"></p>
-      <div class="dlg-actions">
-        <button type="button" class="btn" data-close>Cancel</button>
-        <button type="submit" class="btn primary">Save</button>
-      </div>
-    </form>
-  </dialog>
-
-  <!-- Restock dialog -->
-  <dialog id="dlg-restock">
-    <form id="form-restock" method="dialog">
-      <h2>Restock <span id="restock-name"></span></h2>
-      <label>Quantity <input name="quantity" type="number" min="1" required></label>
-      <label>Note <input name="note" placeholder="e.g. supplier order #123"></label>
-      <p class="form-error" id="restock-error"></p>
-      <div class="dlg-actions">
-        <button type="button" class="btn" data-close>Cancel</button>
-        <button type="submit" class="btn primary">Restock</button>
-      </div>
-    </form>
-  </dialog>
-
-  <div id="toast" class="toast" role="status"></div>
-  <script src="app.js"></script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Smart Retail Inventory</title>
+  </head>
+  <body>
+    <!-- React draws the whole dashboard inside this one div (see src/main.jsx) -->
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
 </html>

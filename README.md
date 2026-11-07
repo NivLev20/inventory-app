@@ -16,10 +16,14 @@ inventory-app/
 │   ├── requirements.txt     ספריות להרצה
 │   ├── requirements-dev.txt ספריות לבדיקות ול-lint
 │   └── Dockerfile           בניית אימג' של ה-backend
-├── frontend/                דשבורד (HTML + JavaScript + Chart.js)
-│   ├── index.html / app.js / style.css
+├── frontend/                דשבורד ב-React (Vite + Chart.js)
+│   ├── src/App.jsx          הקומפוננטה הראשית: טוענת נתונים ומחזיקה את ה-state
+│   ├── src/components/      קומפוננטה לכל חלק במסך (כרטיסים, גרפים, טבלה, טפסים)
+│   ├── src/api.js           כל הקריאות ל-backend במקום אחד
+│   ├── vite.config.js       הגדרות Vite + proxy ל-/api במצב פיתוח
+│   ├── package.json         רשימת הספריות (React, Vite, Chart.js, ESLint)
 │   ├── nginx.conf.template  nginx מגיש את הדשבורד ומעביר /api ל-backend
-│   └── Dockerfile           בניית אימג' של ה-frontend
+│   └── Dockerfile           multi-stage: Node בונה, nginx מגיש
 └── docker-compose.yml       מריץ את הכל מקומית: DB + backend + frontend
 ```
 
@@ -43,7 +47,20 @@ docker compose up --build
 
 עצירה: `Ctrl+C` ואחר כך `docker compose down`. הנתונים נשמרים ב-volume בשם `pgdata`.
 
-## הרצת הבדיקות וה-lint (בלי Docker)
+## פיתוח ה-frontend (React)
+
+ה-backend צריך לרוץ ברקע (`docker compose up -d`). אחר כך:
+
+```bash
+cd frontend
+npm install      # פעם ראשונה, או אחרי שינוי ב-package.json
+npm run dev      # http://localhost:5173 - כל שמירה מתעדכנת מיד בדפדפן
+npm run lint     # בדיקת איכות קוד
+```
+
+`package-lock.json` נכנס ל-Git: הוא נועל את הגרסאות המדויקות, כדי שהבנייה ב-Docker וב-Jenkins תהיה זהה לבנייה אצלך.
+
+## הרצת הבדיקות וה-lint של ה-backend
 
 ```bash
 cd backend

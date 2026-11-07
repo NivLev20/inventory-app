@@ -1,22 +1,26 @@
-// ESLint settings for the dashboard (used by the "lint" stage of the CI pipeline)
+// ESLint = automatic code review for JavaScript/React.
+// Used by "npm run lint" and by the Lint stage of the Jenkins pipeline.
+import js from "@eslint/js";
+import globals from "globals";
+import reactHooks from "eslint-plugin-react-hooks";
+
 export default [
+  { ignores: ["dist", "node_modules"] },
   {
-    files: ["**/*.js"],
-    ignores: ["eslint.config.js"],
+    files: ["**/*.{js,jsx}"],
     languageOptions: {
       ecmaVersion: 2022,
-      sourceType: "script",
-      globals: {
-        window: "readonly", document: "readonly", fetch: "readonly", FormData: "readonly",
-        getComputedStyle: "readonly", setTimeout: "readonly", setInterval: "readonly",
-        Chart: "readonly"
-      }
+      sourceType: "module",
+      globals: globals.browser,
+      parserOptions: { ecmaFeatures: { jsx: true } }
     },
+    plugins: { "react-hooks": reactHooks },
     rules: {
-      "no-unused-vars": "error",
-      "no-undef": "error",
-      "eqeqeq": "error",
-      "semi": ["error", "always"]
+      ...js.configs.recommended.rules,
+      ...reactHooks.configs.recommended.rules,
+      // Components are used inside JSX, which core ESLint can't see - ignore Capitalized names
+      "no-unused-vars": ["error", { varsIgnorePattern: "^[A-Z_]" }],
+      eqeqeq: "error"
     }
   }
 ];
