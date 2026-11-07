@@ -1,24 +1,27 @@
-// "Needs restocking" panel: one card per LOW / OUT product with a one-click Order button.
-// Props: items (low-stock products from the API), onOrder(product)
+// Products at or below their minimum, drawn as shelf-edge labels.
 export default function LowStockPanel({ items, onOrder }) {
   return (
-    <section className="card">
-      <h2>⚠ Needs restocking</h2>
+    <section className="shelf">
+      <div className="panel-head">
+        <h2>Needs restocking</h2>
+        <span className="muted">{items.length ? `${items.length} products` : ""}</span>
+      </div>
       {items.length === 0 ? (
-        <p className="empty">All products are above their minimum level. 🎉</p>
+        <p className="empty">Every product is above its minimum level.</p>
       ) : (
-        <div className="low-list">
+        <div className="shelf-rail">
           {items.map((p) => (
-            // "key" helps React track which card is which when the list changes
-            <div key={p.id} className={`low-item ${p.status}`}>
-              <strong>{p.name}</strong>
-              <span className="meta">
-                {p.store} · {p.stock} left (min {p.min_stock})
+            <article key={p.id} className={`tag ${p.status}`}>
+              <span className="tag-name">{p.name}</span>
+              <span className="tag-store">{p.store}</span>
+              <span className="tag-count">
+                {p.stock} <small>left, minimum {p.min_stock}</small>
               </span>
-              <button className="btn small primary" onClick={() => onOrder(p)}>
+              <span className="tag-sku">{p.sku}</span>
+              <button className="btn small" onClick={() => onOrder(p)}>
                 Order {p.suggested_reorder}
               </button>
-            </div>
+            </article>
           ))}
         </div>
       )}

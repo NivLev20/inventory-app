@@ -3,6 +3,7 @@ import { useState } from "react";
 
 export default function SimulatorCard({ enabled, onToggle, onRush }) {
   const [busy, setBusy] = useState(false);
+  const known = enabled !== null;
 
   async function run(action) {
     setBusy(true);
@@ -13,25 +14,19 @@ export default function SimulatorCard({ enabled, onToggle, onRush }) {
     }
   }
 
-  const known = enabled !== null;
-
   return (
-    <section className="card sim-card">
-      <div className="sim-text">
+    <section className="panel sim-card">
+      <div className="sim-row">
         <h2>Store simulator</h2>
-        <p className="muted">
-          Customer purchases every minute, a new product every two minutes.{" "}
-          {known && (
-            <span className={enabled ? "pill OK" : "pill LOW"}>{enabled ? "Running" : "Paused"}</span>
-          )}
-        </p>
+        {known && <span className={enabled ? "sim-state on" : "sim-state"}>{enabled ? "Running" : "Paused"}</span>}
       </div>
+      <p className="muted">Customers buy every minute; a new product arrives every two minutes.</p>
       <div className="sim-actions">
         <button className="btn" disabled={!known || busy} onClick={() => run(() => onToggle(!enabled))}>
           {enabled ? "Pause" : "Resume"}
         </button>
         <button className="btn primary" disabled={busy} onClick={() => run(onRush)}>
-          Rush hour
+          Start rush hour
         </button>
       </div>
     </section>

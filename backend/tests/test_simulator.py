@@ -61,3 +61,15 @@ def test_paused_simulator_does_nothing(api, monkeypatch, capsys):
     assert simulator.main(["simulator.py", "sales"]) == 0
     assert "paused" in capsys.readouterr().out
     assert api.get("/api/products/analytics")[1]["units_sold_today"] == before
+
+
+def test_unreachable_api_is_reported_without_traceback(capsys):
+    with_closed_port = {"SIM_API_URL": "http://127.0.0.1:9"}
+    old = os.environ.copy()
+    os.environ.update(with_closed_port)
+    try:
+        assert simulator.main(["simulator.py", "sales"]) == 1
+    finally:
+        os.environ.clear()
+        os.environ.update(old)
+    assert "API unavailable" in capsys.readouterr().out

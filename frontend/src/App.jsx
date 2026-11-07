@@ -119,15 +119,21 @@ export default function App() {
       <Header apiUp={apiUp} onAddClick={() => setShowAdd(true)} />
       <main>
         <KpiCards analytics={analytics} />
-        <SimulatorCard enabled={simulation} onToggle={handleToggleSimulation} onRush={handleRush} />
-        <Charts analytics={analytics} />
         <LowStockPanel items={lowStock} onOrder={handleQuickOrder} />
+        <div className="grid">
+          <div className="stack">
+            <Charts analytics={analytics} />
+          </div>
+          <div className="stack">
+            <SimulatorCard enabled={simulation} onToggle={handleToggleSimulation} onRush={handleRush} />
+            <RestockHistory restocks={restocks} />
+          </div>
+        </div>
         <ProductsTable
           products={products}
           onRestock={setRestockTarget}
           onDelete={handleDelete}
         />
-        <RestockHistory restocks={restocks} />
       </main>
 
       {showAdd && (

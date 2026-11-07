@@ -1,28 +1,24 @@
-// The 4 summary cards at the top. A small reusable <Kpi> component is used 4 times.
+// One strip of headline numbers instead of separate cards.
 import { fmtMoney, fmtNumber } from "../format.js";
 
-function Kpi({ label, value, alert = false }) {
+function Stat({ label, value, alert = false }) {
   return (
-    <div className={alert ? "kpi alert" : "kpi"}>
-      <span className="kpi-label">{label}</span>
-      <span className="kpi-value">{value}</span>
+    <div className={alert ? "stat alert" : "stat"}>
+      <span className="stat-value">{value}</span>
+      <span className="stat-label">{label}</span>
     </div>
   );
 }
 
-export default function KpiCards({ analytics }) {
-  // Before the first load, show dashes instead of numbers
-  const a = analytics;
+export default function KpiCards({ analytics: a }) {
+  const show = (fn) => (a ? fn(a) : "–");
   return (
-    <section className="kpis">
-      <Kpi label="Products" value={a ? fmtNumber(a.total_products) : "–"} />
-      <Kpi label="Units in stock" value={a ? fmtNumber(a.total_units) : "–"} />
-      <Kpi label="Inventory value" value={a ? fmtMoney(a.inventory_value) : "–"} />
-      <Kpi
-        label="Need restock"
-        value={a ? fmtNumber(a.by_status.LOW + a.by_status.OUT) : "–"}
-        alert
-      />
+    <section className="stats" aria-label="Summary">
+      <Stat label="Products" value={show((x) => fmtNumber(x.total_products))} />
+      <Stat label="Units on shelves" value={show((x) => fmtNumber(x.total_units))} />
+      <Stat label="Stock value" value={show((x) => fmtMoney(x.inventory_value))} />
+      <Stat label="Sold today" value={show((x) => fmtNumber(x.units_sold_today))} />
+      <Stat label="Need restocking" value={show((x) => fmtNumber(x.by_status.LOW + x.by_status.OUT))} alert />
     </section>
   );
 }

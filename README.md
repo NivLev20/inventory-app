@@ -12,7 +12,7 @@ This is the **application repository** of the project. Infrastructure (Kubernete
 | Database | PostgreSQL 16 |
 | Frontend | React 18, Vite, Chart.js, served by nginx |
 | Containers | Docker (multi-stage builds, non-root images), Docker Compose |
-| Quality | pytest (25 tests), flake8, ESLint |
+| Quality | pytest (26 tests), flake8, ESLint |
 | Observability | Prometheus metrics endpoint (`/metrics`) |
 
 ## Architecture

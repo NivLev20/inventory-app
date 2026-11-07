@@ -39,6 +39,10 @@ CATALOG = [
 ]
 
 
+class ApiUnavailable(Exception):
+    """The API could not be reached; the next CronJob run will try again."""
+
+
 class ApiClient:
     """Minimal JSON client for the inventory API (standard library only)."""
 
@@ -54,6 +58,9 @@ class ApiClient:
                 return res.status, json.loads(res.read() or b"{}")
         except urllib.error.HTTPError as exc:
             return exc.code, json.loads(exc.read() or b"{}")
+        except (urllib.error.URLError, OSError) as exc:
+            # e.g. a backend pod restarting during a deploy
+            raise ApiUnavailable(f"{method} {path}: {exc}") from exc
 
     def get(self, path):
         return self.request("GET", path)
@@ -111,13 +118,21 @@ def main(argv):
     if len(argv) != 2 or argv[1] not in ("sales", "new-product"):
         print(__doc__)
         return 2
+    try:
+        return run(argv[1])
+    except ApiUnavailable as exc:
+        print(f"API unavailable, skipping this run: {exc}")
+        return 1
+
+
+def run(command):
     api = ApiClient(os.environ.get("SIM_API_URL", "http://backend:5000"))
     status, body = api.get("/api/simulation")
     if status == 200 and not body.get("enabled", True):
         print("simulation paused from the dashboard - nothing to do")
         return 0
     rng = random.Random()
-    if argv[1] == "sales":
+    if command == "sales":
         for line in run_sales(api, rng) or ["nothing to sell"]:
             print(line)
     else:

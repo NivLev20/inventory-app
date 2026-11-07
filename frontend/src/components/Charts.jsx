@@ -1,4 +1,4 @@
-// Two charts: total stock over 14 days (line) and units sold vs restocked per day (bars).
+// Two charts: units on shelves over 14 days, and units sold vs delivered per day.
 // Chart.js draws the charts; react-chartjs-2 wraps it as React components.
 import {
   BarElement,
@@ -21,20 +21,32 @@ function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
 
+function ChartPanel({ title, children }) {
+  return (
+    <section className="panel">
+      <div className="panel-head"><h2>{title}</h2></div>
+      <div className="chart-box">{children}</div>
+    </section>
+  );
+}
+
+const STOCK_TITLE = "Units on shelves, last 14 days";
+const MOVES_TITLE = "Sold and delivered per day";
+
 export default function Charts({ analytics }) {
   if (!analytics) {
     return (
-      <section className="grid-2">
-        <div className="card"><h2>Total stock – last 14 days</h2><p className="empty">Loading…</p></div>
-        <div className="card"><h2>Units sold vs restocked per day</h2><p className="empty">Loading…</p></div>
-      </section>
+      <>
+        <ChartPanel title={STOCK_TITLE}><p className="empty">Loading…</p></ChartPanel>
+        <ChartPanel title={MOVES_TITLE}><p className="empty">Loading…</p></ChartPanel>
+      </>
     );
   }
 
-  const brand = cssVar("--brand");
+  const brand = cssVar("--accent");
   const muted = cssVar("--muted");
   const line = cssVar("--line");
-  const sold = cssVar("--low");
+  const sold = cssVar("--sold");
   const labels = analytics.stock_trend.map((d) => d.date.slice(5)); // "11-07"
 
   const options = {
@@ -55,7 +67,9 @@ export default function Charts({ analytics }) {
       backgroundColor: brand + "22",
       fill: true,
       tension: 0.3,
-      pointRadius: 2
+      pointRadius: 0,
+      pointHoverRadius: 4,
+      borderWidth: 2
     }]
   };
 
@@ -63,7 +77,7 @@ export default function Charts({ analytics }) {
     labels,
     datasets: [
       { label: "Sold", data: analytics.sales_trend.map((d) => d.units), backgroundColor: sold, borderRadius: 4 },
-      { label: "Restocked", data: analytics.restocks_trend.map((d) => d.units), backgroundColor: brand, borderRadius: 4 }
+      { label: "Delivered", data: analytics.restocks_trend.map((d) => d.units), backgroundColor: brand, borderRadius: 4 }
     ]
   };
   // Same look as the other chart, but with a legend (two series)
@@ -73,15 +87,9 @@ export default function Charts({ analytics }) {
   };
 
   return (
-    <section className="grid-2">
-      <div className="card">
-        <h2>Total stock – last 14 days</h2>
-        <div className="chart-box"><Line data={stockData} options={options} /></div>
-      </div>
-      <div className="card">
-        <h2>Units sold vs restocked per day</h2>
-        <div className="chart-box"><Bar data={movementsData} options={movementsOptions} /></div>
-      </div>
-    </section>
+    <>
+      <ChartPanel title={STOCK_TITLE}><Line data={stockData} options={options} /></ChartPanel>
+      <ChartPanel title={MOVES_TITLE}><Bar data={movementsData} options={movementsOptions} /></ChartPanel>
+    </>
   );
 }

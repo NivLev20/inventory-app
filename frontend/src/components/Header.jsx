@@ -1,29 +1,20 @@
-// Top bar: title, API status dot, and the "Add product" button.
-// Props: apiUp (true/false/null), onAddClick (function)
+// Top bar: chain name, API connection state and the main actions.
 export default function Header({ apiUp, onAddClick }) {
-  let statusText = "Checking API…";
-  let statusClass = "api-status";
-  if (apiUp === true) {
-    statusText = "API online";
-    statusClass += " up";
-  } else if (apiUp === false) {
-    statusText = "API offline";
-    statusClass += " down";
-  }
+  const status = apiUp === null ? "Connecting" : apiUp ? "Connected" : "Offline";
+  const statusClass = "api-status" + (apiUp === true ? " up" : apiUp === false ? " down" : "");
 
   return (
     <header className="topbar">
-      <div className="brand">
-        <span className="logo" aria-hidden="true">▣</span>
-        <div>
+      <div className="topbar-inner">
+        <div className="brand">
           <h1>Smart Retail Inventory</h1>
-          <p className="sub">Stock levels across all stores</p>
+          <p className="sub">Tel Aviv, Haifa and Jerusalem stores</p>
         </div>
-      </div>
-      <div className="topbar-right">
-        <span className={statusClass}>{statusText}</span>
-        <a className="btn" href="/api/docs" target="_blank" rel="noreferrer">API docs</a>
-        <button className="btn primary" onClick={onAddClick}>+ Add product</button>
+        <div className="topbar-right">
+          <span className={statusClass}>{status}</span>
+          <a className="btn" href="/api/docs" target="_blank" rel="noreferrer">API docs</a>
+          <button className="btn primary" onClick={onAddClick}>Add product</button>
+        </div>
       </div>
     </header>
   );

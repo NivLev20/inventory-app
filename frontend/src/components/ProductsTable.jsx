@@ -14,8 +14,8 @@ export default function ProductsTable({ products, onRestock, onDelete }) {
   );
 
   return (
-    <section className="card">
-      <div className="card-head">
+    <section className="panel">
+      <div className="panel-head">
         <h2>All products</h2>
         <div className="filters">
           <select aria-label="Filter by store" value={store} onChange={(e) => setStore(e.target.value)}>
@@ -46,21 +46,23 @@ export default function ProductsTable({ products, onRestock, onDelete }) {
             {rows.map((p) => (
               <tr key={p.id}>
                 <td>{p.name}</td>
-                <td>{p.sku}</td>
+                <td className="sku">{p.sku}</td>
                 <td>{p.store}</td>
                 <td>{p.category}</td>
                 <td className="num">{fmtNumber(p.stock)}</td>
                 <td className="num">{fmtNumber(p.min_stock)}</td>
                 <td><span className={`pill ${p.status}`}>{p.status}</span></td>
                 <td>
-                  <button className="btn small" onClick={() => onRestock(p)}>Restock</button>{" "}
-                  <button
-                    className="btn small danger"
-                    aria-label={`Delete ${p.name}`}
-                    onClick={() => onDelete(p)}
-                  >
-                    ✕
-                  </button>
+                  <div className="row-actions">
+                    <button className="btn small" onClick={() => onRestock(p)}>Restock</button>
+                    <button
+                      className="btn small danger"
+                      aria-label={`Delete ${p.name}`}
+                      onClick={() => onDelete(p)}
+                    >
+                      Delete
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
