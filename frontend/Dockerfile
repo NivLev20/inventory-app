@@ -19,8 +19,12 @@ USER 101
 ENV BACKEND_URL=http://backend:5000
 
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY start.sh /start.sh
 COPY --from=build /app/dist /usr/share/nginx/html
 
 EXPOSE 8080
+
+# The image's entrypoint runs this script; it sets NGINX_RESOLVER, then starts nginx normally
+CMD ["/bin/sh", "/start.sh"]
 
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- http://127.0.0.1:8080/healthz || exit 1

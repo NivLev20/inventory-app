@@ -1,7 +1,12 @@
-# ${BACKEND_URL} is substituted by the nginx image at container start.
+# ${BACKEND_URL} and ${NGINX_RESOLVER} are substituted at container start (see start.sh).
 server {
     listen 8080;
     server_name _;
+
+    # Resolve the backend name per request instead of once at startup, so nginx starts
+    # even when cluster DNS is not ready yet. The resolver does not apply DNS search
+    # domains, which is why Kubernetes passes the full service name in BACKEND_URL.
+    resolver ${NGINX_RESOLVER} valid=10s ipv6=off;
 
     root /usr/share/nginx/html;
     index index.html;
@@ -21,7 +26,8 @@ server {
     }
 
     location /api/ {
-        proxy_pass ${BACKEND_URL};
+        set $backend_upstream ${BACKEND_URL};
+        proxy_pass $backend_upstream;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_connect_timeout 5s;
