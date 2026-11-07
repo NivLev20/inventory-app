@@ -11,6 +11,8 @@ Endpoints (from the course project #1 spec, plus health/metrics):
     GET    /api/restocks                     restock history
     GET    /api/products/low-stock           products at or below their minimum
     GET    /api/products/analytics           numbers + trends for the dashboard
+    POST   /api/products/<id>/sell           record a sale (JSON: quantity)
+    GET    /api/docs                         interactive API documentation (Swagger UI)
     GET    /health                           liveness probe (app is running)
     GET    /ready                            readiness probe (database reachable)
     GET    /metrics                          Prometheus metrics
@@ -20,9 +22,10 @@ import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
-from flask import Flask, jsonify, request
+from flask import Flask, Response, jsonify, request
 
 import db
+from openapi import DOCS_HTML, SPEC
 
 ALLOWED_FIELDS = ("name", "sku", "category", "store", "price", "stock", "min_stock")
 
@@ -169,6 +172,16 @@ def register_routes(app):
             return jsonify({"status": "not ready", "error": str(exc)}), 503
         return jsonify({"status": "ready"})
 
+    # ---------- API documentation (Swagger)
+
+    @app.get("/api/openapi.json")
+    def openapi_spec():
+        return jsonify(SPEC)
+
+    @app.get("/api/docs")
+    def api_docs():
+        return Response(DOCS_HTML, mimetype="text/html")
+
     # ---------- products CRUD
 
     @app.get("/api/products")
@@ -240,6 +253,7 @@ def register_routes(app):
             return error("Product not found", 404)
         db.execute("DELETE FROM stock_history WHERE product_id = ?", (product_id,))
         db.execute("DELETE FROM restock_logs WHERE product_id = ?", (product_id,))
+        db.execute("DELETE FROM sales WHERE product_id = ?", (product_id,))
         db.execute("DELETE FROM products WHERE id = ?", (product_id,))
         return jsonify({"deleted": product_id})
 
@@ -267,6 +281,29 @@ def register_routes(app):
             (product_id, quantity, before, after, note, ts),
         )
         record_history(product_id, after, "restock")
+        return jsonify(enrich(get_product(product_id)))
+
+    # ---------- sales
+
+    @app.post("/api/products/<int:product_id>/sell")
+    def sell(product_id):
+        product = get_product(product_id)
+        if not product:
+            return error("Product not found", 404)
+        data = request.get_json(silent=True) or {}
+        try:
+            quantity = parse_int(data.get("quantity"), "quantity", minimum=1)
+        except ValueError as exc:
+            return error(str(exc), 400)
+        if quantity > product["stock"]:
+            return error(f"Only {product['stock']} units in stock", 409)
+        after = product["stock"] - quantity
+        ts = now()
+        db.execute("UPDATE products SET stock = ?, updated_at = ? WHERE id = ?",
+                   (after, ts, product_id))
+        db.execute("INSERT INTO sales (product_id, quantity, created_at) VALUES (?, ?, ?)",
+                   (product_id, quantity, ts))
+        record_history(product_id, after, "sale")
         return jsonify(enrich(get_product(product_id)))
 
     @app.get("/api/restocks")
@@ -305,6 +342,7 @@ def register_routes(app):
         # Stock trend: total units at the end of each day, rebuilt from history.
         history = db.query_all("SELECT product_id, stock, created_at FROM stock_history ORDER BY created_at, id")
         restocks = db.query_all("SELECT quantity, created_at FROM restock_logs")
+        sales = db.query_all("SELECT quantity, created_at FROM sales")
         today = datetime.fromisoformat(now()).date()
         start = today - timedelta(days=days - 1)
         latest = {}
@@ -322,6 +360,9 @@ def register_routes(app):
         restocks_per_day = defaultdict(int)
         for r in restocks:
             restocks_per_day[r["created_at"][:10]] += r["quantity"]
+        sales_per_day = defaultdict(int)
+        for s in sales:
+            sales_per_day[s["created_at"][:10]] += s["quantity"]
 
         return jsonify({
             "total_products": len(products),
@@ -334,6 +375,10 @@ def register_routes(app):
             "restocks_trend": [
                 {"date": t["date"], "units": restocks_per_day.get(t["date"], 0)} for t in trend
             ],
+            "sales_trend": [
+                {"date": t["date"], "units": sales_per_day.get(t["date"], 0)} for t in trend
+            ],
+            "units_sold_today": sales_per_day.get(today.isoformat(), 0),
         })
 
 
@@ -374,6 +419,17 @@ def register_metrics(app):
         safe(lambda ps: sum(p["status"] == "OUT" for p in ps)))
     Gauge("inventory_value", "Total inventory value").set_function(
         safe(lambda ps: sum(p["stock_value"] for p in ps)))
+
+    def units_sold_today():
+        try:
+            with app.app_context():
+                row = db.query_one("SELECT COALESCE(SUM(quantity), 0) AS units FROM sales WHERE created_at >= ?",
+                                   (now()[:10],))
+            return float(row["units"])
+        except Exception:
+            return -1
+
+    Gauge("inventory_units_sold_today", "Units sold since midnight (UTC)").set_function(units_sold_today)
 
 
 if __name__ == "__main__":

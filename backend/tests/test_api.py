@@ -159,3 +159,33 @@ def test_seed_data_loads(seeded_client):
     assert data["by_status"]["OUT"] >= 1
     # Today's trend point matches the real current stock total
     assert data["stock_trend"][-1]["total_units"] == data["total_units"]
+
+
+# ---------- sales
+
+def test_sell_decreases_stock(client):
+    pid = add(client, stock=10).get_json()["id"]
+    res = client.post(f"/api/products/{pid}/sell", json={"quantity": 4})
+    assert res.status_code == 200
+    assert res.get_json()["stock"] == 6
+    data = client.get("/api/products/analytics").get_json()
+    assert data["units_sold_today"] == 4
+    assert data["sales_trend"][-1]["units"] == 4
+
+
+def test_cannot_sell_more_than_stock(client):
+    pid = add(client, stock=2).get_json()["id"]
+    res = client.post(f"/api/products/{pid}/sell", json={"quantity": 5})
+    assert res.status_code == 409
+    assert client.get(f"/api/products/{pid}").get_json()["stock"] == 2
+
+
+# ---------- API docs
+
+def test_openapi_and_docs(client):
+    spec = client.get("/api/openapi.json").get_json()
+    assert spec["openapi"].startswith("3.")
+    assert "/api/products/{product_id}/sell" in spec["paths"]
+    res = client.get("/api/docs")
+    assert res.status_code == 200
+    assert b"swagger-ui" in res.data

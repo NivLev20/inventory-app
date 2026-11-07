@@ -12,7 +12,7 @@ This is the **application repository** of the project. Infrastructure (Kubernete
 | Database | PostgreSQL 16 |
 | Frontend | React 18, Vite, Chart.js, served by nginx |
 | Containers | Docker (multi-stage builds, non-root images), Docker Compose |
-| Quality | pytest (15 tests), flake8, ESLint |
+| Quality | pytest (21 tests), flake8, ESLint |
 | Observability | Prometheus metrics endpoint (`/metrics`) |
 
 ## Architecture
@@ -31,7 +31,9 @@ inventory-app/
 │   ├── app.py                Endpoints and business logic
 │   ├── db.py                 Database layer (PostgreSQL in runtime, SQLite in tests)
 │   ├── seed.py               Demo data: 12 products, 3 stores, 14 days of history
-│   ├── tests/test_api.py     Unit tests
+│   ├── simulator.py          Store activity simulator (run as Kubernetes CronJobs)
+│   ├── openapi.py            OpenAPI specification for /api/docs
+│   ├── tests/               Unit tests (API and simulator)
 │   ├── requirements.txt      Runtime dependencies
 │   ├── requirements-dev.txt  Test and lint dependencies
 │   └── Dockerfile
@@ -99,12 +101,15 @@ Tests use a temporary SQLite database, so CI does not need a PostgreSQL server.
 | PUT | `/api/products/<id>` | Update a product or its stock |
 | DELETE | `/api/products/<id>` | Delete a product |
 | POST | `/api/products/<id>/restock` | Add stock. Required: `quantity`. Optional: `note` |
+| POST | `/api/products/<id>/sell` | Record a sale (decreases stock). Required: `quantity` |
 | GET | `/api/restocks` | Restock history |
 | GET | `/api/products/low-stock` | Products at or below their minimum, with a suggested reorder quantity |
 | GET | `/api/products/analytics` | Totals and 14-day trends for the dashboard |
 | GET | `/health` | Liveness probe: the process is running |
 | GET | `/ready` | Readiness probe: the database is reachable |
 | GET | `/metrics` | Prometheus metrics |
+| GET | `/api/docs` | Interactive API documentation (Swagger UI) |
+| GET | `/api/openapi.json` | OpenAPI 3 specification |
 
 Example:
 
@@ -123,8 +128,10 @@ curl -X POST http://localhost:5000/api/products/1/restock \
 - **Automatic stock status** per product: `OK`, `LOW` (at or below minimum) or `OUT`.
 - **Suggested reorder quantity**: enough to reach twice the minimum level, exposed as a one-click "Order" button.
 - **Multi-store**: every product belongs to a store; the dashboard filters by store and status.
-- **Trends**: total units over 14 days and units restocked per day.
-- **Business metrics for Prometheus**, beyond API latency: `inventory_low_stock_products`, `inventory_out_of_stock_products`, `inventory_units_total`, `inventory_value`.
+- **Trends**: total units over 14 days, and units sold vs restocked per day.
+- **Store simulator**: `simulator.py sales` makes random purchases (and supplier deliveries for sold-out items); `simulator.py new-product` launches the next product from a fixed catalog. In Kubernetes they run as CronJobs, so the dashboard and Grafana show live activity.
+- **API documentation**: interactive Swagger UI at `/api/docs`.
+- **Business metrics for Prometheus**, beyond API latency: `inventory_low_stock_products`, `inventory_out_of_stock_products`, `inventory_units_total`, `inventory_value`, `inventory_units_sold_today`.
 
 ## Configuration
 

@@ -22,6 +22,7 @@ export default function Header({ apiUp, onAddClick }) {
       </div>
       <div className="topbar-right">
         <span className={statusClass}>{statusText}</span>
+        <a className="btn" href="/api/docs" target="_blank" rel="noreferrer">API docs</a>
         <button className="btn primary" onClick={onAddClick}>+ Add product</button>
       </div>
     </header>

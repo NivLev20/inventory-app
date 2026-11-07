@@ -53,6 +53,14 @@ POSTGRES_SCHEMA = [
         created_at TIMESTAMP NOT NULL
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS sales (
+        id SERIAL PRIMARY KEY,
+        product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+        quantity INTEGER NOT NULL,
+        created_at TIMESTAMP NOT NULL
+    )
+    """,
 ]
 
 SQLITE_SCHEMA = [
