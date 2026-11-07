@@ -45,7 +45,7 @@ export default function ProductsTable({ products, onRestock, onDelete }) {
             )}
             {rows.map((p) => (
               <tr key={p.id}>
-                <td>{p.name}</td>
+                <td className="product-name">{p.name}</td>
                 <td className="sku">{p.sku}</td>
                 <td>{p.store}</td>
                 <td>{p.category}</td>

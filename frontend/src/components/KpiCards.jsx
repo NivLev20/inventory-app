@@ -1,11 +1,11 @@
-// One strip of headline numbers instead of separate cards.
+// Headline numbers.
 import { fmtMoney, fmtNumber } from "../format.js";
 
 function Stat({ label, value, alert = false }) {
   return (
     <div className={alert ? "stat alert" : "stat"}>
-      <span className="stat-value">{value}</span>
       <span className="stat-label">{label}</span>
+      <span className="stat-value">{value}</span>
     </div>
   );
 }

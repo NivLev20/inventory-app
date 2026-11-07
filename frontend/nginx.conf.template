@@ -11,6 +11,16 @@ server {
         try_files $uri $uri/ /index.html;
     }
 
+    # index.html is always re-checked, so a new deployment shows up on the next page load
+    location = /index.html {
+        add_header Cache-Control "no-cache";
+    }
+
+    # Vite puts a content hash in asset file names, so they can be cached for a year
+    location /assets/ {
+        add_header Cache-Control "public, max-age=31536000, immutable";
+    }
+
     location /api/ {
         proxy_pass ${BACKEND_URL};
         proxy_set_header Host $host;

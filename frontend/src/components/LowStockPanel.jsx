@@ -1,28 +1,41 @@
-// Products at or below their minimum, drawn as shelf-edge labels.
+// Products at or below their minimum. The gauge shows current stock against the minimum
+// (marker), on a scale up to the reorder target (twice the minimum).
 export default function LowStockPanel({ items, onOrder }) {
   return (
-    <section className="shelf">
+    <section className="panel">
       <div className="panel-head">
         <h2>Needs restocking</h2>
-        <span className="muted">{items.length ? `${items.length} products` : ""}</span>
+        {items.length > 0 && <span className="muted">{items.length} products</span>}
       </div>
       {items.length === 0 ? (
         <p className="empty">Every product is above its minimum level.</p>
       ) : (
-        <div className="shelf-rail">
-          {items.map((p) => (
-            <article key={p.id} className={`tag ${p.status}`}>
-              <span className="tag-name">{p.name}</span>
-              <span className="tag-store">{p.store}</span>
-              <span className="tag-count">
-                {p.stock} <small>left, minimum {p.min_stock}</small>
-              </span>
-              <span className="tag-sku">{p.sku}</span>
-              <button className="btn small" onClick={() => onOrder(p)}>
-                Order {p.suggested_reorder}
-              </button>
-            </article>
-          ))}
+        <div className="restock-list">
+          {items.map((p) => {
+            const target = Math.max(p.min_stock * 2, 1);
+            const fill = Math.min(100, (p.stock / target) * 100);
+            return (
+              <article key={p.id} className={`restock-item ${p.status}`}>
+                <div className="restock-top">
+                  <div>
+                    <div className="restock-name">{p.name}</div>
+                    <div className="restock-store">{p.store}</div>
+                  </div>
+                  <span className="restock-count">{p.stock}</span>
+                </div>
+                <div className="gauge" role="img" aria-label={`${p.stock} in stock, minimum ${p.min_stock}`}>
+                  <span className="gauge-fill" style={{ width: `${fill}%` }} />
+                  <span className="gauge-min" style={{ left: "50%" }} />
+                </div>
+                <div className="restock-foot">
+                  <span className="restock-meta">Minimum {p.min_stock}, {p.sku}</span>
+                  <button className="btn small primary" onClick={() => onOrder(p)}>
+                    Order {p.suggested_reorder}
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       )}
     </section>

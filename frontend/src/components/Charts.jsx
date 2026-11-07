@@ -33,7 +33,8 @@ function ChartPanel({ title, children }) {
 const STOCK_TITLE = "Units on shelves, last 14 days";
 const MOVES_TITLE = "Sold and delivered per day";
 
-export default function Charts({ analytics }) {
+// "theme" is used as a React key, so the charts are redrawn with the new CSS colors after a switch.
+export default function Charts({ analytics, theme }) {
   if (!analytics) {
     return (
       <>
@@ -64,7 +65,15 @@ export default function Charts({ analytics }) {
     datasets: [{
       data: analytics.stock_trend.map((d) => d.total_units),
       borderColor: brand,
-      backgroundColor: brand + "22",
+      // soft gradient under the line, fading to transparent
+      backgroundColor: (context) => {
+        const { ctx, chartArea } = context.chart;
+        if (!chartArea) return brand + "22";
+        const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+        gradient.addColorStop(0, brand + "55");
+        gradient.addColorStop(1, brand + "00");
+        return gradient;
+      },
       fill: true,
       tension: 0.3,
       pointRadius: 0,
@@ -76,8 +85,10 @@ export default function Charts({ analytics }) {
   const movementsData = {
     labels,
     datasets: [
-      { label: "Sold", data: analytics.sales_trend.map((d) => d.units), backgroundColor: sold, borderRadius: 4 },
-      { label: "Delivered", data: analytics.restocks_trend.map((d) => d.units), backgroundColor: brand, borderRadius: 4 }
+      { label: "Sold", data: analytics.sales_trend.map((d) => d.units), backgroundColor: sold,
+        borderRadius: 6, maxBarThickness: 18 },
+      { label: "Delivered", data: analytics.restocks_trend.map((d) => d.units), backgroundColor: brand,
+        borderRadius: 6, maxBarThickness: 18 }
     ]
   };
   // Same look as the other chart, but with a legend (two series)
@@ -88,8 +99,8 @@ export default function Charts({ analytics }) {
 
   return (
     <>
-      <ChartPanel title={STOCK_TITLE}><Line data={stockData} options={options} /></ChartPanel>
-      <ChartPanel title={MOVES_TITLE}><Bar data={movementsData} options={movementsOptions} /></ChartPanel>
+      <ChartPanel title={STOCK_TITLE}><Line key={theme} data={stockData} options={options} /></ChartPanel>
+      <ChartPanel title={MOVES_TITLE}><Bar key={theme} data={movementsData} options={movementsOptions} /></ChartPanel>
     </>
   );
 }

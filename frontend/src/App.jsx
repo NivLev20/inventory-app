@@ -26,6 +26,7 @@ export default function App() {
   const [showAdd, setShowAdd] = useState(false);
   const [restockTarget, setRestockTarget] = useState(null); // product being restocked
   const [simulation, setSimulation] = useState(null); // true / false, null until loaded
+  const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || "dark");
 
   const notify = useCallback((message) => {
     setToast(message);
@@ -53,6 +54,18 @@ export default function App() {
       notify("Could not load data: " + err.message);
     }
   }, [notify]);
+
+  // Dark is the default; the choice is remembered in this browser
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try {
+      localStorage.setItem("theme", next);
+    } catch {
+      // storage blocked (private mode): the switch still works for this visit
+    }
+    setTheme(next);
+  }
 
   // Runs once when the page opens: first load + a timer for auto refresh
   useEffect(() => {
@@ -116,13 +129,13 @@ export default function App() {
 
   return (
     <>
-      <Header apiUp={apiUp} onAddClick={() => setShowAdd(true)} />
+      <Header apiUp={apiUp} theme={theme} onToggleTheme={toggleTheme} onAddClick={() => setShowAdd(true)} />
       <main>
         <KpiCards analytics={analytics} />
         <LowStockPanel items={lowStock} onOrder={handleQuickOrder} />
         <div className="grid">
           <div className="stack">
-            <Charts analytics={analytics} />
+            <Charts analytics={analytics} theme={theme} />
           </div>
           <div className="stack">
             <SimulatorCard enabled={simulation} onToggle={handleToggleSimulation} onRush={handleRush} />
