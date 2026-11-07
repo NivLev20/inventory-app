@@ -19,6 +19,11 @@ RUN npm run build
 # "unprivileged" image runs nginx as a regular user on port 8080 (not root)
 FROM nginxinc/nginx-unprivileged:1.27-alpine
 
+# Apply OS security fixes published after the base image was built (found by Trivy)
+USER root
+RUN apk upgrade --no-cache
+USER 101
+
 # Where nginx forwards /api requests. Overridden by docker-compose or Kubernetes.
 ENV BACKEND_URL=http://backend:5000
 
