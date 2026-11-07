@@ -1,95 +1,112 @@
-# Smart Retail Inventory – inventory-app
+# Smart Retail Inventory – Application
 
-מערכת לניהול מלאי לרשת חנויות: מעקב אחרי כמויות בכל סניף, התראה על מוצרים שירדו מתחת למינימום, הזמנת מלאי בלחיצה אחת ודשבורד עם מגמות.
+Inventory management for a multi-store retail chain: track stock per store, get alerted when products drop below their minimum level, restock with one click, and follow stock trends on a dashboard.
 
-זהו **ריפו האפליקציה** של פרויקט הגמר (פרויקט #1). התשתית (Kubernetes, Jenkins, ניטור) נמצאת בריפו `inventory-devops`.
+This is the **application repository** of the project. Infrastructure (Kubernetes manifests, Jenkins pipeline, monitoring) lives in the `inventory-devops` repository.
 
-## מה יש כאן
+## Tech stack
+
+| Layer | Technology |
+|---|---|
+| Backend | Python 3.12, Flask, gunicorn |
+| Database | PostgreSQL 16 |
+| Frontend | React 18, Vite, Chart.js, served by nginx |
+| Containers | Docker (multi-stage builds, non-root images), Docker Compose |
+| Quality | pytest (15 tests), flake8, ESLint |
+| Observability | Prometheus metrics endpoint (`/metrics`) |
+
+## Architecture
+
+```
+Browser ──► frontend (nginx :8080) ──/api──► backend (Flask :5000) ──► PostgreSQL (:5432, internal only)
+                                                   │
+                                                   └── /metrics ──► Prometheus ──► Grafana
+```
+
+## Repository layout
 
 ```
 inventory-app/
-├── backend/                 Flask API (Python)
-│   ├── app.py               כל ה-endpoints והלוגיקה
-│   ├── db.py                חיבור למסד הנתונים (PostgreSQL, או SQLite בבדיקות)
-│   ├── seed.py              נתוני דוגמה: 12 מוצרים ב-3 סניפים + היסטוריה של 14 יום
-│   ├── tests/test_api.py    15 בדיקות אוטומטיות
-│   ├── requirements.txt     ספריות להרצה
-│   ├── requirements-dev.txt ספריות לבדיקות ול-lint
-│   └── Dockerfile           בניית אימג' של ה-backend
-├── frontend/                דשבורד ב-React (Vite + Chart.js)
-│   ├── src/App.jsx          הקומפוננטה הראשית: טוענת נתונים ומחזיקה את ה-state
-│   ├── src/components/      קומפוננטה לכל חלק במסך (כרטיסים, גרפים, טבלה, טפסים)
-│   ├── src/api.js           כל הקריאות ל-backend במקום אחד
-│   ├── vite.config.js       הגדרות Vite + proxy ל-/api במצב פיתוח
-│   ├── package.json         רשימת הספריות (React, Vite, Chart.js, ESLint)
-│   ├── nginx.conf.template  nginx מגיש את הדשבורד ומעביר /api ל-backend
-│   └── Dockerfile           multi-stage: Node בונה, nginx מגיש
-└── docker-compose.yml       מריץ את הכל מקומית: DB + backend + frontend
+├── backend/                  Flask REST API
+│   ├── app.py                Endpoints and business logic
+│   ├── db.py                 Database layer (PostgreSQL in runtime, SQLite in tests)
+│   ├── seed.py               Demo data: 12 products, 3 stores, 14 days of history
+│   ├── tests/test_api.py     Unit tests
+│   ├── requirements.txt      Runtime dependencies
+│   ├── requirements-dev.txt  Test and lint dependencies
+│   └── Dockerfile
+├── frontend/                 React dashboard
+│   ├── src/App.jsx           Root component: loads data and holds state
+│   ├── src/components/       One component per dashboard section
+│   ├── src/api.js            All backend calls in one place
+│   ├── vite.config.js        Vite config, /api proxy for local development
+│   ├── nginx.conf.template   Serves the build and proxies /api to the backend
+│   └── Dockerfile            Multi-stage: Node builds, nginx serves
+└── docker-compose.yml        Local environment: db + backend + frontend
 ```
 
-## ארכיטקטורה
+## Quick start
 
-```
- דפדפן ──► frontend (nginx :8080) ──/api──► backend (Flask :5000) ──► PostgreSQL (:5432)
-                                                  │
-                                                  └── /metrics ──► Prometheus ──► Grafana
-```
-
-## הרצה מקומית (צריך רק Docker)
+Requires Docker only.
 
 ```bash
-docker compose up --build
+docker compose up --build -d
 ```
 
-- דשבורד: http://localhost:8080
-- API: http://localhost:5000/api/products
-- בדיקת תקינות: http://localhost:5000/health
+| Service | URL |
+|---|---|
+| Dashboard | http://localhost:8080 |
+| API | http://localhost:5000/api/products |
+| Health check | http://localhost:5000/health |
 
-עצירה: `Ctrl+C` ואחר כך `docker compose down`. הנתונים נשמרים ב-volume בשם `pgdata`.
+Stop with `docker compose down`. Data persists in the `pgdata` volume.
 
-## פיתוח ה-frontend (React)
+To change the local database password, copy `.env.example` to `.env` and edit it. `.env` is git-ignored.
 
-ה-backend צריך לרוץ ברקע (`docker compose up -d`). אחר כך:
+## Development
+
+### Frontend
+
+The backend must be running (`docker compose up -d db backend`).
 
 ```bash
 cd frontend
-npm install      # פעם ראשונה, או אחרי שינוי ב-package.json
-npm run dev      # http://localhost:5173 - כל שמירה מתעדכנת מיד בדפדפן
-npm run lint     # בדיקת איכות קוד
+npm install      # first time, or after package.json changes
+npm run dev      # http://localhost:5173 with hot reload
+npm run lint
 ```
 
-`package-lock.json` נכנס ל-Git: הוא נועל את הגרסאות המדויקות, כדי שהבנייה ב-Docker וב-Jenkins תהיה זהה לבנייה אצלך.
+`package-lock.json` is committed so that local, Docker and CI builds install identical dependency versions.
 
-## הרצת הבדיקות וה-lint של ה-backend
+### Backend tests and lint
+
+Run inside a throwaway container, no local Python required:
 
 ```bash
-cd backend
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements-dev.txt
-flake8 .
-pytest -v
+docker run --rm -v "$PWD/backend:/app" -w /app python:3.12-slim \
+  sh -c "pip install -q -r requirements-dev.txt && flake8 . && pytest -q"
 ```
 
-הבדיקות משתמשות ב-SQLite זמני, כך שהן לא צריכות PostgreSQL. ככה שלב הבדיקות ב-pipeline רץ מהר ופשוט.
+Tests use a temporary SQLite database, so CI does not need a PostgreSQL server.
 
-## Endpoints
+## API reference
 
-| Method | Path | מה עושה |
+| Method | Path | Description |
 |---|---|---|
-| GET | `/api/products` | כל המוצרים (סינון: `?store=Haifa&status=LOW`) |
-| GET | `/api/products/<id>` | מוצר אחד |
-| POST | `/api/products` | הוספת מוצר: `name`, `sku` (חובה), `stock`, `min_stock`, `price`, `category`, `store` |
-| PUT | `/api/products/<id>` | עדכון מוצר או כמות |
-| DELETE | `/api/products/<id>` | מחיקת מוצר |
-| POST | `/api/products/<id>/restock` | הוספת מלאי: `quantity` (חובה), `note` |
-| GET | `/api/restocks` | היסטוריית חידושי מלאי |
-| GET | `/api/products/low-stock` | מוצרים שבמינימום או מתחתיו, כולל כמות מומלצת להזמנה |
-| GET | `/api/products/analytics` | סיכומים ומגמות לדשבורד |
-| GET | `/health` | liveness – האפליקציה רצה |
-| GET | `/ready` | readiness – יש חיבור למסד הנתונים |
-| GET | `/metrics` | מדדים ל-Prometheus |
+| GET | `/api/products` | List products. Filters: `?store=Haifa&status=LOW` |
+| GET | `/api/products/<id>` | Get one product |
+| POST | `/api/products` | Create a product. Required: `name`, `sku`. Optional: `stock`, `min_stock`, `price`, `category`, `store` |
+| PUT | `/api/products/<id>` | Update a product or its stock |
+| DELETE | `/api/products/<id>` | Delete a product |
+| POST | `/api/products/<id>/restock` | Add stock. Required: `quantity`. Optional: `note` |
+| GET | `/api/restocks` | Restock history |
+| GET | `/api/products/low-stock` | Products at or below their minimum, with a suggested reorder quantity |
+| GET | `/api/products/analytics` | Totals and 14-day trends for the dashboard |
+| GET | `/health` | Liveness probe: the process is running |
+| GET | `/ready` | Readiness probe: the database is reachable |
+| GET | `/metrics` | Prometheus metrics |
 
-דוגמה:
+Example:
 
 ```bash
 curl -X POST http://localhost:5000/api/products \
@@ -97,22 +114,30 @@ curl -X POST http://localhost:5000/api/products \
   -d '{"name":"Laptop Stand","sku":"ELC-010","stock":4,"min_stock":10,"store":"Haifa","price":129}'
 
 curl -X POST http://localhost:5000/api/products/1/restock \
-  -H "Content-Type: application/json" -d '{"quantity":25,"note":"supplier order"}'
+  -H "Content-Type: application/json" \
+  -d '{"quantity":25,"note":"supplier order"}'
 ```
 
-## הפיצ'רים ה"חכמים"
+## Features
 
-- **סטטוס אוטומטי לכל מוצר:** `OK`, `LOW` (במינימום או מתחתיו) או `OUT` (אזל).
-- **כמות מומלצת להזמנה:** כמה צריך להזמין כדי להגיע לפעמיים המינימום. בדשבורד זה כפתור "Order X" בלחיצה אחת.
-- **ריבוי סניפים:** לכל מוצר יש סניף, ואפשר לסנן לפיו.
-- **שווי מלאי ומגמות:** סך היחידות לאורך 14 יום ויחידות שחודשו בכל יום.
-- **מדדים עסקיים ל-Prometheus:** לא רק latency של ה-API, אלא גם `inventory_low_stock_products`, `inventory_out_of_stock_products`, `inventory_units_total` ו-`inventory_value`. כך אפשר להראות את מצב המלאי ב-Grafana ולהגדיר התראה.
+- **Automatic stock status** per product: `OK`, `LOW` (at or below minimum) or `OUT`.
+- **Suggested reorder quantity**: enough to reach twice the minimum level, exposed as a one-click "Order" button.
+- **Multi-store**: every product belongs to a store; the dashboard filters by store and status.
+- **Trends**: total units over 14 days and units restocked per day.
+- **Business metrics for Prometheus**, beyond API latency: `inventory_low_stock_products`, `inventory_out_of_stock_products`, `inventory_units_total`, `inventory_value`.
 
-## משתני סביבה (יוגדרו ב-Kubernetes דרך ConfigMap ו-Secret)
+## Configuration
 
-| משתנה | ברירת מחדל | הסבר |
-|---|---|---|
-| `DATABASE_URL` | `sqlite:///inventory.db` | כתובת ה-DB. ב-Docker/K8s: `postgresql://user:pass@host:5432/db` (**Secret**) |
-| `APP_ENV` | `development` | שם הסביבה (**ConfigMap**) |
-| `SEED_DATA` | `false` | `true` טוען נתוני דוגמה כשה-DB ריק (**ConfigMap**) |
-| `BACKEND_URL` | `http://backend:5000` | (frontend) לאן nginx מעביר את `/api` (**ConfigMap**) |
+| Variable | Default | Description | Kubernetes source |
+|---|---|---|---|
+| `DATABASE_URL` | `sqlite:///inventory.db` | Database connection string, e.g. `postgresql://user:pass@host:5432/db` | Secret |
+| `APP_ENV` | `development` | Environment name | ConfigMap |
+| `SEED_DATA` | `false` | Load demo data when the database is empty | ConfigMap |
+| `BACKEND_URL` | `http://backend:5000` | Frontend only: where nginx proxies `/api` | ConfigMap |
+
+## Security notes
+
+- Containers run as non-root users on minimal base images (`slim`, `alpine`).
+- The database port is not published outside the Docker network.
+- Secrets are never committed: `.env` is git-ignored and only `.env.example` with placeholder values is tracked.
+- All SQL uses parameterized queries; API input is validated.
