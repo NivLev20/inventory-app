@@ -4,6 +4,10 @@ Inventory management for a multi-store retail chain: track stock per store, get 
 
 This is the **application repository** of the project. Infrastructure (Kubernetes manifests, Jenkins pipeline, monitoring) lives in the `inventory-devops` repository.
 
+## For reviewers
+
+The infrastructure repository `inventory-devops` holds the Kubernetes manifests, the Jenkins pipeline and monitoring. Its README has a **requirements coverage** table that maps every item of the project brief to a file, and a one-command install (`scripts/bootstrap.sh`).
+
 ## Tech stack
 
 | Layer | Technology |
