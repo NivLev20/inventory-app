@@ -11,9 +11,12 @@ The switch is controlled by the DATABASE_URL environment variable:
 """
 import os
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime
 
 from flask import g, current_app
+
+STARTUP_LOCK_ID = 727001  # any fixed number; identifies our startup lock
 
 POSTGRES_SCHEMA = [
     """
@@ -152,6 +155,25 @@ def init_db():
         cur.execute(statement)
     conn.commit()
     cur.close()
+
+
+@contextmanager
+def startup_lock():
+    """Cluster-wide lock for startup work, using a PostgreSQL advisory lock.
+
+    When two backend replicas start together, both would try to create tables
+    and insert demo data at the same time, and one would crash on a duplicate.
+    With the lock, the second replica waits, then sees the work is already done.
+    SQLite (tests) has a single process, so no lock is needed there.
+    """
+    if not is_postgres():
+        yield
+        return
+    execute("SELECT pg_advisory_lock(?)", (STARTUP_LOCK_ID,))
+    try:
+        yield
+    finally:
+        execute("SELECT pg_advisory_unlock(?)", (STARTUP_LOCK_ID,))
 
 
 def ping():

@@ -132,10 +132,13 @@ def create_app(config=None):
 
     with app.app_context():
         wait_for_database(app)
-        db.init_db()
-        if app.config["SEED_DATA"]:
-            from seed import seed_if_empty
-            seed_if_empty()
+        # Several replicas may start at the same moment (Kubernetes runs 2 backends).
+        # The lock makes them create tables / load demo data one after another, not together.
+        with db.startup_lock():
+            db.init_db()
+            if app.config["SEED_DATA"]:
+                from seed import seed_if_empty
+                seed_if_empty()
 
     register_routes(app)
     register_metrics(app)
