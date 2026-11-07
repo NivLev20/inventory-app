@@ -1,5 +1,3 @@
-// Product table with filters by store and status.
-// The filter values are local state: only this component needs them.
 import { useState } from "react";
 import { fmtNumber } from "../format.js";
 
@@ -7,7 +5,6 @@ export default function ProductsTable({ products, onRestock, onDelete }) {
   const [store, setStore] = useState("");
   const [status, setStatus] = useState("");
 
-  // Build the store list from the data itself (no hard-coded store names)
   const stores = [...new Set(products.map((p) => p.store))].sort();
   const rows = products.filter(
     (p) => (!store || p.store === store) && (!status || p.status === status)

@@ -1,6 +1,4 @@
-// All calls to the Flask backend live in this one file.
-// The browser always calls "/api/..." on the same address it loaded the page from;
-// nginx (production) or Vite (development) forwards it to the backend.
+// Same-origin "/api" calls; nginx (production) or Vite (development) proxies them to the backend.
 
 const BASE = "/api";
 
@@ -11,7 +9,6 @@ async function request(path, options = {}) {
   });
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
-    // The backend returns {"error": "..."} - show that message to the user
     throw new Error(body.error || `Request failed (${res.status})`);
   }
   return body;

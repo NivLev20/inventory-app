@@ -1,4 +1,3 @@
-// Headline numbers.
 import { fmtMoney, fmtNumber } from "../format.js";
 
 function Stat({ label, value, alert = false }) {

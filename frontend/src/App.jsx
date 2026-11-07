@@ -1,5 +1,3 @@
-// App = the main component. It loads all data from the API, keeps it in "state",
-// and passes pieces of it down to the smaller components as "props".
 import { useCallback, useEffect, useState } from "react";
 import { api } from "./api.js";
 import Header from "./components/Header.jsx";
@@ -16,7 +14,6 @@ import SimulatorCard from "./components/SimulatorCard.jsx";
 const REFRESH_MS = 30000; // reload data every 30 seconds
 
 export default function App() {
-  // --- state: data that, when changed, makes React redraw the screen
   const [products, setProducts] = useState([]);
   const [lowStock, setLowStock] = useState([]);
   const [analytics, setAnalytics] = useState(null);
@@ -33,7 +30,6 @@ export default function App() {
     setTimeout(() => setToast(""), 2500);
   }, []);
 
-  // Load everything from the backend in parallel
   const loadAll = useCallback(async () => {
     try {
       const [a, p, l, r, sim] = await Promise.all([
@@ -55,26 +51,23 @@ export default function App() {
     }
   }, [notify]);
 
-  // Dark is the default; the choice is remembered in this browser
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
     document.documentElement.dataset.theme = next;
     try {
       localStorage.setItem("theme", next);
     } catch {
-      // storage blocked (private mode): the switch still works for this visit
+      // storage blocked (private mode): the switch still applies to this visit
     }
     setTheme(next);
   }
 
-  // Runs once when the page opens: first load + a timer for auto refresh
   useEffect(() => {
     loadAll();
     const timer = setInterval(loadAll, REFRESH_MS);
     return () => clearInterval(timer); // cleanup when the component is removed
   }, [loadAll]);
 
-  // --- actions (passed down to child components)
 
   async function handleRestock(product, quantity, note) {
     const updated = await api.restock(product.id, quantity, note);

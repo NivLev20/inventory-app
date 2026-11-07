@@ -1,5 +1,4 @@
-# nginx serves the dashboard files and forwards /api/* to the Flask backend.
-# ${BACKEND_URL} is filled in when the container starts (default: http://backend:5000).
+# ${BACKEND_URL} is substituted by the nginx image at container start.
 server {
     listen 8080;
     server_name _;
@@ -29,7 +28,6 @@ server {
         proxy_read_timeout 30s;
     }
 
-    # Health check for Docker / Kubernetes
     location = /healthz {
         access_log off;
         default_type text/plain;

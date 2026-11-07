@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..700&display=swap" />
     <script>
-      // Apply the saved theme before the page renders (dark by default), to avoid a flash
+      // Set the theme before first paint to avoid a light flash (dark by default)
       try {
         document.documentElement.dataset.theme = localStorage.getItem("theme") || "dark";
       } catch {
@@ -17,7 +17,6 @@
     </script>
   </head>
   <body>
-    <!-- React draws the whole dashboard inside this one div (see src/main.jsx) -->
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

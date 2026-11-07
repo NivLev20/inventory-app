@@ -1,4 +1,3 @@
-// Entry point: tells React to draw the <App /> component inside <div id="root">.
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";

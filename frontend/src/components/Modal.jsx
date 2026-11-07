@@ -1,5 +1,4 @@
-// Reusable popup window built on the browser's <dialog> element.
-// It opens as soon as it is shown on the page, and calls onClose on Esc or Cancel.
+// Native <dialog>: opens on mount; Esc triggers onClose.
 import { useEffect, useRef } from "react";
 
 export default function Modal({ title, onClose, children }) {

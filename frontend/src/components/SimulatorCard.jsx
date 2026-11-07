@@ -1,4 +1,3 @@
-// Controls for the store simulator that runs as Kubernetes CronJobs.
 import { useState } from "react";
 
 export default function SimulatorCard({ enabled, onToggle, onRush }) {

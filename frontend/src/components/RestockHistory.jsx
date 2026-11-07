@@ -1,4 +1,3 @@
-// The most recent deliveries.
 import { fmtDateTime } from "../format.js";
 
 export default function RestockHistory({ restocks }) {

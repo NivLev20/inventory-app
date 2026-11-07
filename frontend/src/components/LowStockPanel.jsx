@@ -1,5 +1,4 @@
-// Products at or below their minimum. The gauge shows current stock against the minimum
-// (marker), on a scale up to the reorder target (twice the minimum).
+// Gauge scale runs to the reorder target (2 x minimum); the marker at 50% is the minimum.
 export default function LowStockPanel({ items, onOrder }) {
   return (
     <section className="panel">

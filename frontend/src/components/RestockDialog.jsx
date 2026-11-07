@@ -1,4 +1,3 @@
-// "Restock" form for one product: quantity + optional note.
 import { useState } from "react";
 import Modal from "./Modal.jsx";
 

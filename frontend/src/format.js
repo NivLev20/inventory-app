@@ -1,5 +1,3 @@
-// Small helpers for showing numbers and dates the same way everywhere.
-
 export const fmtNumber = (n) => Number(n).toLocaleString("en-US");
 
 export const fmtMoney = (n) =>

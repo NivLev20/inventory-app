@@ -1,5 +1,3 @@
-// Two charts: units on shelves over 14 days, and units sold vs delivered per day.
-// Chart.js draws the charts; react-chartjs-2 wraps it as React components.
 import {
   BarElement,
   CategoryScale,
@@ -13,10 +11,10 @@ import {
 } from "chart.js";
 import { Bar, Line } from "react-chartjs-2";
 
-// Chart.js only includes the parts you register (keeps the bundle small)
+// Register only what is used, to keep the bundle small
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, Filler, Legend, Tooltip);
 
-// Read colors from the CSS variables so charts match light and dark mode
+// Canvas cannot use CSS variables directly, so read the current theme's values
 function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 }
@@ -33,7 +31,7 @@ function ChartPanel({ title, children }) {
 const STOCK_TITLE = "Units on shelves, last 14 days";
 const MOVES_TITLE = "Sold and delivered per day";
 
-// "theme" is used as a React key, so the charts are redrawn with the new CSS colors after a switch.
+// "theme" is the React key, so charts are recreated with the new colors after a theme switch
 export default function Charts({ analytics, theme }) {
   if (!analytics) {
     return (
@@ -65,7 +63,6 @@ export default function Charts({ analytics, theme }) {
     datasets: [{
       data: analytics.stock_trend.map((d) => d.total_units),
       borderColor: brand,
-      // soft gradient under the line, fading to transparent
       backgroundColor: (context) => {
         const { ctx, chartArea } = context.chart;
         if (!chartArea) return brand + "22";
@@ -91,7 +88,6 @@ export default function Charts({ analytics, theme }) {
         borderRadius: 6, maxBarThickness: 18 }
     ]
   };
-  // Same look as the other chart, but with a legend (two series)
   const movementsOptions = {
     ...options,
     plugins: { legend: { display: true, labels: { color: muted, boxWidth: 12 } } }

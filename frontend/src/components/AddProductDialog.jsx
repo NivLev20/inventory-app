@@ -1,4 +1,3 @@
-// "Add product" form. Each input is a "controlled" field: its value lives in state.
 import { useState } from "react";
 import Modal from "./Modal.jsx";
 
@@ -9,21 +8,19 @@ export default function AddProductDialog({ onSave, onClose }) {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // One change handler for all fields: uses the input's "name" attribute
   function update(e) {
     const { name, value, type } = e.target;
     setForm({ ...form, [name]: type === "number" ? Number(value) : value });
   }
 
   async function submit(e) {
-    e.preventDefault(); // stop the browser from reloading the page
+    e.preventDefault();
     setSaving(true);
     setError("");
     try {
       await onSave(form);
       onClose();
     } catch (err) {
-      // e.g. "SKU 'ELC-001' already exists" from the backend
       setError(err.message);
     } finally {
       setSaving(false);
