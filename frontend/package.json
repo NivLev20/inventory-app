@@ -1,0 +1,11 @@
+{
+  "name": "inventory-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint app.js"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0"
+  }
+}
