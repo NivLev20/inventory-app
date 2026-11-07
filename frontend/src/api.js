@@ -25,5 +25,8 @@ export const api = {
   addProduct: (product) => request("/products", { method: "POST", body: JSON.stringify(product) }),
   deleteProduct: (id) => request(`/products/${id}`, { method: "DELETE" }),
   restock: (id, quantity, note) =>
-    request(`/products/${id}/restock`, { method: "POST", body: JSON.stringify({ quantity, note }) })
+    request(`/products/${id}/restock`, { method: "POST", body: JSON.stringify({ quantity, note }) }),
+  getSimulation: () => request("/simulation"),
+  setSimulation: (enabled) => request("/simulation", { method: "PUT", body: JSON.stringify({ enabled }) }),
+  rushHour: () => request("/simulation/rush", { method: "POST" })
 };

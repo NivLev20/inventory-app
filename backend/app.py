@@ -12,12 +12,16 @@ Endpoints (from the course project #1 spec, plus health/metrics):
     GET    /api/products/low-stock           products at or below their minimum
     GET    /api/products/analytics           numbers + trends for the dashboard
     POST   /api/products/<id>/sell           record a sale (JSON: quantity)
+    GET    /api/simulation                   is the store simulator running?
+    PUT    /api/simulation                   pause / resume it (JSON: enabled)
+    POST   /api/simulation/rush              rush hour: ~20 purchases right now
     GET    /api/docs                         interactive API documentation (Swagger UI)
     GET    /health                           liveness probe (app is running)
     GET    /ready                            readiness probe (database reachable)
     GET    /metrics                          Prometheus metrics
 """
 import os
+import random
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -100,6 +104,20 @@ def validate(data, partial=False):
 
 def get_product(product_id):
     return db.query_one("SELECT * FROM products WHERE id = ?", (product_id,))
+
+
+def sell_product(product, quantity):
+    """Decrease stock and log the sale. Caller has checked quantity <= stock."""
+    after = product["stock"] - quantity
+    ts = now()
+    db.execute("UPDATE products SET stock = ?, updated_at = ? WHERE id = ?", (after, ts, product["id"]))
+    db.execute("INSERT INTO sales (product_id, quantity, created_at) VALUES (?, ?, ?)",
+               (product["id"], quantity, ts))
+    record_history(product["id"], after, "sale")
+
+
+def simulation_enabled():
+    return db.get_setting("simulation_enabled", "true") == "true"
 
 
 def record_history(product_id, stock, reason):
@@ -297,14 +315,38 @@ def register_routes(app):
             return error(str(exc), 400)
         if quantity > product["stock"]:
             return error(f"Only {product['stock']} units in stock", 409)
-        after = product["stock"] - quantity
-        ts = now()
-        db.execute("UPDATE products SET stock = ?, updated_at = ? WHERE id = ?",
-                   (after, ts, product_id))
-        db.execute("INSERT INTO sales (product_id, quantity, created_at) VALUES (?, ?, ?)",
-                   (product_id, quantity, ts))
-        record_history(product_id, after, "sale")
+        sell_product(product, quantity)
         return jsonify(enrich(get_product(product_id)))
+
+    # ---------- simulator control
+
+    @app.get("/api/simulation")
+    def simulation_status():
+        return jsonify({"enabled": simulation_enabled()})
+
+    @app.put("/api/simulation")
+    def simulation_update():
+        data = request.get_json(silent=True) or {}
+        if not isinstance(data.get("enabled"), bool):
+            return error("'enabled' must be true or false", 400)
+        db.set_setting("simulation_enabled", "true" if data["enabled"] else "false")
+        return jsonify({"enabled": data["enabled"]})
+
+    @app.post("/api/simulation/rush")
+    def simulation_rush():
+        """Rush hour: up to 20 random purchases right now, independent of the CronJobs."""
+        rng = random.Random()
+        sales = units = 0
+        for _ in range(20):
+            in_stock = db.query_all("SELECT * FROM products WHERE stock > 0")
+            if not in_stock:
+                break
+            product = rng.choice(in_stock)
+            quantity = rng.randint(1, min(5, product["stock"]))
+            sell_product(product, quantity)
+            sales += 1
+            units += quantity
+        return jsonify({"sales": sales, "units": units})
 
     @app.get("/api/restocks")
     def restock_history():

@@ -52,3 +52,12 @@ def test_new_products_follow_catalog_and_stop(api):
 
 def test_cli_rejects_unknown_command(capsys):
     assert simulator.main(["simulator.py", "bogus"]) == 2
+
+
+def test_paused_simulator_does_nothing(api, monkeypatch, capsys):
+    api.client.put("/api/simulation", json={"enabled": False})
+    monkeypatch.setattr(simulator, "ApiClient", lambda url: api)
+    before = api.get("/api/products/analytics")[1]["units_sold_today"]
+    assert simulator.main(["simulator.py", "sales"]) == 0
+    assert "paused" in capsys.readouterr().out
+    assert api.get("/api/products/analytics")[1]["units_sold_today"] == before

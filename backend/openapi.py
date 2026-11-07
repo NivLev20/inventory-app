@@ -32,7 +32,8 @@ SPEC = {
         "description": "Stock management for a multi-store retail chain.",
     },
     "tags": [
-        {"name": "Products"}, {"name": "Stock movements"}, {"name": "Analytics"}, {"name": "Health"},
+        {"name": "Products"}, {"name": "Stock movements"}, {"name": "Analytics"},
+        {"name": "Simulator"}, {"name": "Health"},
     ],
     "paths": {
         "/api/products": {
@@ -72,6 +73,19 @@ SPEC = {
                      "requestBody": _body("Sale"),
                      "responses": {"200": _ok("Updated product", _PRODUCT), "400": _ERROR,
                                    "404": _ERROR, "409": _ERROR}},
+        },
+        "/api/simulation": {
+            "get": {"tags": ["Simulator"], "summary": "Is the store simulator running?",
+                    "responses": {"200": _ok("Simulator state")}},
+            "put": {"tags": ["Simulator"], "summary": "Pause or resume the store simulator",
+                    "requestBody": {"required": True, "content": {_JSON: {"schema": {
+                        "type": "object", "required": ["enabled"],
+                        "properties": {"enabled": {"type": "boolean"}}}}}},
+                    "responses": {"200": _ok("New state"), "400": _ERROR}},
+        },
+        "/api/simulation/rush": {
+            "post": {"tags": ["Simulator"], "summary": "Rush hour: about 20 random purchases now",
+                     "responses": {"200": _ok("Number of sales and units sold")}},
         },
         "/api/restocks": {
             "get": {"tags": ["Stock movements"], "summary": "Restock history",

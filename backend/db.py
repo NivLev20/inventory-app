@@ -54,6 +54,12 @@ POSTGRES_SCHEMA = [
     )
     """,
     """
+    CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    )
+    """,
+    """
     CREATE TABLE IF NOT EXISTS sales (
         id SERIAL PRIMARY KEY,
         product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
@@ -163,6 +169,20 @@ def init_db():
         cur.execute(statement)
     conn.commit()
     cur.close()
+
+
+def get_setting(key, default=None):
+    row = query_one("SELECT value FROM settings WHERE key = ?", (key,))
+    return row["value"] if row else default
+
+
+def set_setting(key, value):
+    # Upsert syntax supported by both PostgreSQL and SQLite
+    execute(
+        "INSERT INTO settings (key, value) VALUES (?, ?) "
+        "ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+        (key, value),
+    )
 
 
 @contextmanager

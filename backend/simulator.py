@@ -112,6 +112,10 @@ def main(argv):
         print(__doc__)
         return 2
     api = ApiClient(os.environ.get("SIM_API_URL", "http://backend:5000"))
+    status, body = api.get("/api/simulation")
+    if status == 200 and not body.get("enabled", True):
+        print("simulation paused from the dashboard - nothing to do")
+        return 0
     rng = random.Random()
     if argv[1] == "sales":
         for line in run_sales(api, rng) or ["nothing to sell"]:

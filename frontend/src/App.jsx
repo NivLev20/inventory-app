@@ -11,6 +11,7 @@ import RestockHistory from "./components/RestockHistory.jsx";
 import AddProductDialog from "./components/AddProductDialog.jsx";
 import RestockDialog from "./components/RestockDialog.jsx";
 import Toast from "./components/Toast.jsx";
+import SimulatorCard from "./components/SimulatorCard.jsx";
 
 const REFRESH_MS = 30000; // reload data every 30 seconds
 
@@ -24,6 +25,7 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [restockTarget, setRestockTarget] = useState(null); // product being restocked
+  const [simulation, setSimulation] = useState(null); // true / false, null until loaded
 
   const notify = useCallback((message) => {
     setToast(message);
@@ -33,16 +35,18 @@ export default function App() {
   // Load everything from the backend in parallel
   const loadAll = useCallback(async () => {
     try {
-      const [a, p, l, r] = await Promise.all([
+      const [a, p, l, r, sim] = await Promise.all([
         api.getAnalytics(),
         api.getProducts(),
         api.getLowStock(),
-        api.getRestocks()
+        api.getRestocks(),
+        api.getSimulation()
       ]);
       setAnalytics(a);
       setProducts(p);
       setLowStock(l);
       setRestocks(r);
+      setSimulation(sim.enabled);
       setApiUp(true);
     } catch (err) {
       setApiUp(false);
@@ -79,6 +83,26 @@ export default function App() {
     await loadAll();
   }
 
+  async function handleToggleSimulation(enabled) {
+    try {
+      const state = await api.setSimulation(enabled);
+      setSimulation(state.enabled);
+      notify(state.enabled ? "Simulator resumed" : "Simulator paused");
+    } catch (err) {
+      notify(err.message);
+    }
+  }
+
+  async function handleRush() {
+    try {
+      const result = await api.rushHour();
+      notify(`Rush hour: ${result.sales} sales, ${result.units} units sold`);
+      await loadAll();
+    } catch (err) {
+      notify(err.message);
+    }
+  }
+
   async function handleDelete(product) {
     if (!window.confirm(`Delete "${product.name}"?`)) return;
     try {
@@ -95,6 +119,7 @@ export default function App() {
       <Header apiUp={apiUp} onAddClick={() => setShowAdd(true)} />
       <main>
         <KpiCards analytics={analytics} />
+        <SimulatorCard enabled={simulation} onToggle={handleToggleSimulation} onRush={handleRush} />
         <Charts analytics={analytics} />
         <LowStockPanel items={lowStock} onOrder={handleQuickOrder} />
         <ProductsTable

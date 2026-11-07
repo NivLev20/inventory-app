@@ -177,3 +177,8 @@ dialog .row { display: grid; grid-template-columns: repeat(auto-fit, minmax(110p
 dialog h2 { margin-bottom: 12px; }
 button:disabled { opacity: 0.6; cursor: default; }
 a.btn { text-decoration: none; }
+
+.sim-card { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+.sim-card h2 { margin-bottom: 4px; }
+.sim-text { min-width: 0; }
+.sim-actions { display: flex; gap: 8px; }

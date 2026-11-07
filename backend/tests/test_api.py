@@ -189,3 +189,26 @@ def test_openapi_and_docs(client):
     res = client.get("/api/docs")
     assert res.status_code == 200
     assert b"swagger-ui" in res.data
+
+
+# ---------- simulator control
+
+def test_simulation_toggle(client):
+    assert client.get("/api/simulation").get_json() == {"enabled": True}
+    assert client.put("/api/simulation", json={"enabled": False}).status_code == 200
+    assert client.get("/api/simulation").get_json() == {"enabled": False}
+    assert client.put("/api/simulation", json={"enabled": "no"}).status_code == 400
+
+
+def test_rush_hour_sells_stock(client):
+    add(client, sku="A", stock=50)
+    add(client, sku="B", stock=50)
+    result = client.post("/api/simulation/rush").get_json()
+    assert result["sales"] == 20
+    remaining = sum(p["stock"] for p in client.get("/api/products").get_json())
+    assert remaining == 100 - result["units"]
+
+
+def test_rush_hour_with_empty_store(client):
+    add(client, sku="EMPTY", stock=0)
+    assert client.post("/api/simulation/rush").get_json() == {"sales": 0, "units": 0}
