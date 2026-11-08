@@ -57,6 +57,8 @@ services:
           i=$$((i + 1))
           sleep 60
         done
+    healthcheck:
+      disable: true   # the image's check looks for the API server, which this container does not run
     depends_on:
       - backend
     restart: unless-stopped
