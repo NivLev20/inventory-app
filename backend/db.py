@@ -2,7 +2,7 @@
 Database layer.
 
 In production (Docker / Kubernetes) the app talks to PostgreSQL.
-In unit tests (CI pipeline) it uses SQLite in memory/file, so tests run
+In unit tests (CI pipeline) it uses a temporary SQLite file, so tests run
 fast without needing a real database server.
 
 The switch is controlled by the DATABASE_URL environment variable:
@@ -12,7 +12,7 @@ The switch is controlled by the DATABASE_URL environment variable:
 import os
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import date, datetime
 
 from flask import g, current_app
 
@@ -67,6 +67,11 @@ POSTGRES_SCHEMA = [
         created_at TIMESTAMP NOT NULL
     )
     """,
+    # Analytics filters these tables by date; the simulator adds thousands of rows a day
+    "CREATE INDEX IF NOT EXISTS idx_sales_created ON sales (created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_restock_logs_created ON restock_logs (created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_stock_history_created ON stock_history (created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_stock_history_product ON stock_history (product_id, id)",
 ]
 
 SQLITE_SCHEMA = [
@@ -119,12 +124,17 @@ def _sql(query):
     return query.replace("?", "%s") if is_postgres() else query
 
 
+def day_of(column):
+    """SQL expression for the calendar day of a timestamp column, as YYYY-MM-DD."""
+    return f"CAST({column} AS DATE)" if is_postgres() else f"substr({column}, 1, 10)"
+
+
 def _row_to_dict(row):
     if row is None:
         return None
     result = dict(row)
     for key, value in result.items():
-        if isinstance(value, datetime):
+        if isinstance(value, (datetime, date)):
             result[key] = value.isoformat()
         elif value.__class__.__name__ == "Decimal":
             result[key] = float(value)
@@ -153,13 +163,32 @@ def execute(query, params=(), returning_id=False):
     if returning_id:
         query = query.rstrip() + " RETURNING id"
     cur.execute(_sql(query), params)
-    new_id = None
-    if returning_id:
-        row = cur.fetchone()
-        new_id = row["id"] if not isinstance(row, tuple) else row[0]
-    conn.commit()
+    new_id = cur.fetchone()["id"] if returning_id else None
     cur.close()
+    if not g.get("in_transaction"):
+        conn.commit()
     return new_id
+
+
+@contextmanager
+def transaction():
+    """Run several statements as one unit: all are committed, or none are."""
+    conn = get_db()
+    g.in_transaction = True
+    try:
+        yield
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        g.in_transaction = False
+
+
+def is_integrity_error(exc):
+    """True for unique / foreign key violations from either database driver."""
+    return isinstance(exc, sqlite3.IntegrityError) or exc.__class__.__name__ in (
+        "IntegrityError", "UniqueViolation", "ForeignKeyViolation")
 
 
 def init_db():
@@ -201,6 +230,9 @@ def startup_lock():
     try:
         yield
     finally:
+        # If the startup work failed, the transaction is aborted and must be cleared
+        # before the unlock can run; otherwise the original error would be hidden.
+        get_db().rollback()
         execute("SELECT pg_advisory_unlock(?)", (STARTUP_LOCK_ID,))
 
 

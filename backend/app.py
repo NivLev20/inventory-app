@@ -20,6 +20,7 @@ Endpoints (from the course project #1 spec, plus health/metrics):
     GET    /ready                            readiness probe (database reachable)
     GET    /metrics                          Prometheus metrics
 """
+import math
 import os
 import random
 import time
@@ -62,13 +63,18 @@ def error(message, code):
     return jsonify({"error": message}), code
 
 
+MAX_PRICE = 99_999_999.99  # NUMERIC(10, 2)
+MAX_QUANTITY = 1_000_000
+
+
 def parse_int(value, field, minimum=0):
-    try:
-        number = int(value)
-    except (TypeError, ValueError):
+    whole = isinstance(value, int) or (isinstance(value, float) and value.is_integer()) \
+        or (isinstance(value, str) and value.strip().lstrip("-").isdigit())
+    if isinstance(value, bool) or not whole:
         raise ValueError(f"'{field}' must be a whole number")
-    if isinstance(value, bool) or number < minimum:
-        raise ValueError(f"'{field}' must be {minimum} or more")
+    number = int(value)
+    if number < minimum or number > MAX_QUANTITY:
+        raise ValueError(f"'{field}' must be between {minimum} and {MAX_QUANTITY}")
     return number
 
 
@@ -84,11 +90,12 @@ def validate(data, partial=False):
             clean[field] = parse_int(value, field)
         elif field == "price":
             try:
-                clean[field] = round(float(value), 2)
+                price = float(value)
             except (TypeError, ValueError):
                 raise ValueError("'price' must be a number")
-            if clean[field] < 0:
-                raise ValueError("'price' must be 0 or more")
+            if isinstance(value, bool) or not math.isfinite(price) or not 0 <= price <= MAX_PRICE:
+                raise ValueError(f"'price' must be between 0 and {MAX_PRICE}")
+            clean[field] = round(price, 2)
         else:
             if not isinstance(value, str) or not value.strip():
                 raise ValueError(f"'{field}' must be a non-empty text")
@@ -106,14 +113,25 @@ def get_product(product_id):
     return db.query_one("SELECT * FROM products WHERE id = ?", (product_id,))
 
 
-def sell_product(product, quantity):
-    """Decrease stock and log the sale. Caller has checked quantity <= stock."""
-    after = product["stock"] - quantity
+def sell_product(product_id, quantity):
+    """Take stock atomically. Returns the new stock level, or None if there was not enough.
+
+    The check and the decrement are one conditional UPDATE, so two concurrent sales
+    (replicas, CronJobs, rush hour) can neither oversell nor overwrite each other.
+    """
     ts = now()
-    db.execute("UPDATE products SET stock = ?, updated_at = ? WHERE id = ?", (after, ts, product["id"]))
-    db.execute("INSERT INTO sales (product_id, quantity, created_at) VALUES (?, ?, ?)",
-               (product["id"], quantity, ts))
-    record_history(product["id"], after, "sale")
+    with db.transaction():
+        row = db.query_one(
+            "UPDATE products SET stock = stock - ?, updated_at = ? "
+            "WHERE id = ? AND stock >= ? RETURNING stock",
+            (quantity, ts, product_id, quantity),
+        )
+        if row is None:
+            return None
+        db.execute("INSERT INTO sales (product_id, quantity, created_at) VALUES (?, ?, ?)",
+                   (product_id, quantity, ts))
+        record_history(product_id, row["stock"], "sale")
+    return row["stock"]
 
 
 def simulation_enabled():
@@ -186,8 +204,9 @@ def register_routes(app):
     def ready():
         try:
             db.ping()
-        except Exception as exc:  # database not reachable yet
-            return jsonify({"status": "not ready", "error": str(exc)}), 503
+        except Exception:
+            app.logger.warning("Readiness check failed", exc_info=True)
+            return jsonify({"status": "not ready"}), 503
         return jsonify({"status": "ready"})
 
     # ---------- API documentation (Swagger)
@@ -234,14 +253,20 @@ def register_routes(app):
         data.setdefault("stock", 0)
         data.setdefault("min_stock", 10)
         ts = now()
-        new_id = db.execute(
-            "INSERT INTO products (name, sku, category, store, price, stock, min_stock, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (data["name"], data["sku"], data["category"], data["store"], data["price"],
-             data["stock"], data["min_stock"], ts, ts),
-            returning_id=True,
-        )
-        record_history(new_id, data["stock"], "created")
+        try:
+            with db.transaction():
+                new_id = db.execute(
+                    "INSERT INTO products (name, sku, category, store, price, stock, min_stock, "
+                    "created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (data["name"], data["sku"], data["category"], data["store"], data["price"],
+                     data["stock"], data["min_stock"], ts, ts),
+                    returning_id=True,
+                )
+                record_history(new_id, data["stock"], "created")
+        except Exception as exc:
+            if db.is_integrity_error(exc):  # same SKU created concurrently
+                return error(f"SKU '{data['sku']}' already exists", 409)
+            raise
         return jsonify(enrich(get_product(new_id))), 201
 
     @app.put("/api/products/<int:product_id>")
@@ -256,22 +281,26 @@ def register_routes(app):
         if "sku" in data and data["sku"] != product["sku"]:
             if db.query_one("SELECT id FROM products WHERE sku = ?", (data["sku"],)):
                 return error(f"SKU '{data['sku']}' already exists", 409)
-        columns = ", ".join(f"{field} = ?" for field in data)
-        db.execute(
-            f"UPDATE products SET {columns}, updated_at = ? WHERE id = ?",
-            (*data.values(), now(), product_id),
-        )
-        if "stock" in data and data["stock"] != product["stock"]:
-            record_history(product_id, data["stock"], "manual update")
+        columns = ", ".join(f"{field} = ?" for field in data)  # names come from ALLOWED_FIELDS only
+        try:
+            with db.transaction():
+                db.execute(
+                    f"UPDATE products SET {columns}, updated_at = ? WHERE id = ?",
+                    (*data.values(), now(), product_id),
+                )
+                if "stock" in data and data["stock"] != product["stock"]:
+                    record_history(product_id, data["stock"], "manual update")
+        except Exception as exc:
+            if db.is_integrity_error(exc):
+                return error(f"SKU '{data['sku']}' already exists", 409)
+            raise
         return jsonify(enrich(get_product(product_id)))
 
     @app.delete("/api/products/<int:product_id>")
     def delete_product(product_id):
         if not get_product(product_id):
             return error("Product not found", 404)
-        db.execute("DELETE FROM stock_history WHERE product_id = ?", (product_id,))
-        db.execute("DELETE FROM restock_logs WHERE product_id = ?", (product_id,))
-        db.execute("DELETE FROM sales WHERE product_id = ?", (product_id,))
+        # History, restock logs and sales go with it (ON DELETE CASCADE)
         db.execute("DELETE FROM products WHERE id = ?", (product_id,))
         return jsonify({"deleted": product_id})
 
@@ -287,18 +316,20 @@ def register_routes(app):
             quantity = parse_int(data.get("quantity"), "quantity", minimum=1)
         except ValueError as exc:
             return error(str(exc), 400)
-        note = str(data.get("note", "")).strip() or None
-        before = product["stock"]
-        after = before + quantity
+        note = str(data.get("note", "")).strip()[:200] or None
         ts = now()
-        db.execute("UPDATE products SET stock = ?, updated_at = ? WHERE id = ?",
-                   (after, ts, product_id))
-        db.execute(
-            "INSERT INTO restock_logs (product_id, quantity, stock_before, stock_after, note, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (product_id, quantity, before, after, note, ts),
-        )
-        record_history(product_id, after, "restock")
+        with db.transaction():
+            # Relative update: concurrent sales and restocks never overwrite each other
+            after = db.query_one(
+                "UPDATE products SET stock = stock + ?, updated_at = ? WHERE id = ? RETURNING stock",
+                (quantity, ts, product_id),
+            )["stock"]
+            db.execute(
+                "INSERT INTO restock_logs (product_id, quantity, stock_before, stock_after, note, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (product_id, quantity, after - quantity, after, note, ts),
+            )
+            record_history(product_id, after, "restock")
         return jsonify(enrich(get_product(product_id)))
 
     # ---------- sales
@@ -313,9 +344,8 @@ def register_routes(app):
             quantity = parse_int(data.get("quantity"), "quantity", minimum=1)
         except ValueError as exc:
             return error(str(exc), 400)
-        if quantity > product["stock"]:
-            return error(f"Only {product['stock']} units in stock", 409)
-        sell_product(product, quantity)
+        if sell_product(product_id, quantity) is None:
+            return error(f"Only {get_product(product_id)['stock']} units in stock", 409)
         return jsonify(enrich(get_product(product_id)))
 
     # ---------- simulator control
@@ -343,9 +373,9 @@ def register_routes(app):
                 break
             product = rng.choice(in_stock)
             quantity = rng.randint(1, min(5, product["stock"]))
-            sell_product(product, quantity)
-            sales += 1
-            units += quantity
+            if sell_product(product["id"], quantity) is not None:
+                sales += 1
+                units += quantity
         return jsonify({"sales": sales, "units": units})
 
     @app.get("/api/restocks")
@@ -382,29 +412,36 @@ def register_routes(app):
             store["low_or_out"] += p["status"] != "OK"
 
         # Stock trend: total units at the end of each day, rebuilt from history.
-        history = db.query_all("SELECT product_id, stock, created_at FROM stock_history ORDER BY created_at, id")
-        restocks = db.query_all("SELECT quantity, created_at FROM restock_logs")
-        sales = db.query_all("SELECT quantity, created_at FROM sales")
+        # Only the requested window is read: a baseline (last level per product before it)
+        # plus the rows inside it, so the cost does not grow with the age of the system.
         today = datetime.fromisoformat(now()).date()
         start = today - timedelta(days=days - 1)
-        latest = {}
+        since = start.isoformat()
+        latest = {r["product_id"]: r["stock"] for r in db.query_all(
+            "SELECT product_id, stock FROM stock_history WHERE id IN "
+            "(SELECT MAX(id) FROM stock_history WHERE created_at < ? GROUP BY product_id)", (since,))}
+        history = db.query_all(
+            "SELECT product_id, stock, created_at FROM stock_history WHERE created_at >= ? ORDER BY created_at, id",
+            (since,))
+        alive = {p["id"] for p in products}
         trend = []
         index = 0
         for offset in range(days):
-            day = start + timedelta(days=offset)
-            while index < len(history) and history[index]["created_at"][:10] <= day.isoformat():
+            day = (start + timedelta(days=offset)).isoformat()
+            while index < len(history) and history[index]["created_at"][:10] <= day:
                 latest[history[index]["product_id"]] = history[index]["stock"]
                 index += 1
-            alive = {p["id"] for p in products}
-            trend.append({"date": day.isoformat(),
-                          "total_units": sum(v for k, v in latest.items() if k in alive)})
+            trend.append({"date": day, "total_units": sum(v for k, v in latest.items() if k in alive)})
 
-        restocks_per_day = defaultdict(int)
-        for r in restocks:
-            restocks_per_day[r["created_at"][:10]] += r["quantity"]
-        sales_per_day = defaultdict(int)
-        for s in sales:
-            sales_per_day[s["created_at"][:10]] += s["quantity"]
+        def units_per_day(table):
+            day = db.day_of("created_at")
+            rows = db.query_all(
+                f"SELECT {day} AS day, SUM(quantity) AS units FROM {table} WHERE created_at >= ? GROUP BY {day}",
+                (since,))
+            return {r["day"]: int(r["units"]) for r in rows}
+
+        restocks_per_day = units_per_day("restock_logs")
+        sales_per_day = units_per_day("sales")
 
         return jsonify({
             "total_products": len(products),
@@ -424,12 +461,45 @@ def register_routes(app):
         })
 
 
+class InventoryCollector:
+    """Business metrics, computed once per Prometheus scrape (one database round trip).
+
+    If the database is unreachable the metrics are simply absent for that scrape,
+    so graphs show a gap instead of a misleading value.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    def collect(self):
+        from prometheus_client.core import GaugeMetricFamily
+        try:
+            with self.app.app_context():
+                products = [enrich(p) for p in db.query_all("SELECT * FROM products")]
+                sold = db.query_one("SELECT COALESCE(SUM(quantity), 0) AS units FROM sales WHERE created_at >= ?",
+                                    (now()[:10],))["units"]
+        except Exception:
+            self.app.logger.warning("Inventory metrics unavailable", exc_info=True)
+            return
+        values = [
+            ("inventory_products_total", "Number of products", len(products)),
+            ("inventory_units_total", "Total units in stock", sum(p["stock"] for p in products)),
+            ("inventory_low_stock_products", "Products at or below their minimum, not sold out",
+             sum(p["status"] == "LOW" for p in products)),
+            ("inventory_out_of_stock_products", "Products with zero stock",
+             sum(p["status"] == "OUT" for p in products)),
+            ("inventory_value", "Total inventory value", sum(p["stock_value"] for p in products)),
+            ("inventory_units_sold_today", "Units sold since midnight (UTC)", float(sold)),
+        ]
+        for name, description, value in values:
+            yield GaugeMetricFamily(name, description, value=value)
+
+
 def register_metrics(app):
     """Expose /metrics for Prometheus: request latency/count + inventory gauges."""
     if app.config.get("TESTING"):
         return
     try:
-        from prometheus_client import Gauge
         from prometheus_flask_exporter import PrometheusMetrics
     except ImportError:  # library not installed (e.g. a minimal local run)
         app.logger.warning("prometheus_flask_exporter not installed - /metrics disabled")
@@ -438,41 +508,8 @@ def register_metrics(app):
     metrics = PrometheusMetrics(app, group_by="url_rule")
     metrics.info("inventory_app_info", "Inventory app info", env=app.config["APP_ENV"])
 
-    def inventory_numbers():
-        with app.app_context():
-            products = [enrich(p) for p in db.query_all("SELECT * FROM products")]
-        return products
-
-    def safe(fn):
-        def wrapper():
-            try:
-                return fn(inventory_numbers())
-            except Exception:
-                return -1
-        return wrapper
-
-    Gauge("inventory_products_total", "Number of products").set_function(
-        safe(lambda ps: len(ps)))
-    Gauge("inventory_units_total", "Total units in stock").set_function(
-        safe(lambda ps: sum(p["stock"] for p in ps)))
-    Gauge("inventory_low_stock_products", "Products at or below minimum stock").set_function(
-        safe(lambda ps: sum(p["status"] == "LOW" for p in ps)))
-    Gauge("inventory_out_of_stock_products", "Products with zero stock").set_function(
-        safe(lambda ps: sum(p["status"] == "OUT" for p in ps)))
-    Gauge("inventory_value", "Total inventory value").set_function(
-        safe(lambda ps: sum(p["stock_value"] for p in ps)))
-
-    def units_sold_today():
-        try:
-            with app.app_context():
-                row = db.query_one("SELECT COALESCE(SUM(quantity), 0) AS units FROM sales WHERE created_at >= ?",
-                                   (now()[:10],))
-            return float(row["units"])
-        except Exception:
-            return -1
-
-    Gauge("inventory_units_sold_today", "Units sold since midnight (UTC)").set_function(units_sold_today)
-
+    from prometheus_client.core import REGISTRY
+    REGISTRY.register(InventoryCollector(app))
 
 if __name__ == "__main__":
     # Local run: python app.py   (in Docker we use gunicorn: "app:create_app()")

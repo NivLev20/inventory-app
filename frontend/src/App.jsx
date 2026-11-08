@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { api } from "./api.js";
 import Header from "./components/Header.jsx";
 import KpiCards from "./components/KpiCards.jsx";
@@ -25,10 +25,13 @@ export default function App() {
   const [simulation, setSimulation] = useState(null); // true / false, null until loaded
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || "dark");
 
+  const toastTimer = useRef(null);
   const notify = useCallback((message) => {
     setToast(message);
-    setTimeout(() => setToast(""), 2500);
+    clearTimeout(toastTimer.current); // a new message gets its full 2.5 s
+    toastTimer.current = setTimeout(() => setToast(""), 2500);
   }, []);
+  useEffect(() => () => clearTimeout(toastTimer.current), []);
 
   const loadAll = useCallback(async () => {
     try {

@@ -28,9 +28,11 @@ export default function LowStockPanel({ items, onOrder }) {
                 </div>
                 <div className="restock-foot">
                   <span className="restock-meta">Minimum {p.min_stock}, {p.sku}</span>
-                  <button className="btn small primary" onClick={() => onOrder(p)}>
-                    Order {p.suggested_reorder}
-                  </button>
+                  {p.suggested_reorder > 0 && (
+                    <button className="btn small primary" onClick={() => onOrder(p)}>
+                      Order {p.suggested_reorder}
+                    </button>
+                  )}
                 </div>
               </article>
             );

@@ -19,7 +19,7 @@ export default function SimulatorCard({ enabled, onToggle, onRush }) {
         <h2>Store simulator</h2>
         {known && <span className={enabled ? "sim-state on" : "sim-state"}>{enabled ? "Running" : "Paused"}</span>}
       </div>
-      <p className="muted">Customers buy every minute; a new product arrives every two minutes.</p>
+      <p className="muted">Customers buy every minute. Every two minutes a new product arrives, until all 16 catalog items are in the store.</p>
       <div className="sim-actions">
         <button className="btn" disabled={!known || busy} onClick={() => run(() => onToggle(!enabled))}>
           {enabled ? "Pause" : "Resume"}

@@ -212,3 +212,37 @@ def test_rush_hour_sells_stock(client):
 def test_rush_hour_with_empty_store(client):
     add(client, sku="EMPTY", stock=0)
     assert client.post("/api/simulation/rush").get_json() == {"sales": 0, "units": 0}
+
+
+# ---------- data integrity
+
+def test_rejected_sale_leaves_no_trace(client):
+    pid = add(client, stock=2).get_json()["id"]
+    client.post(f"/api/products/{pid}/sell", json={"quantity": 5})
+    assert client.get("/api/products/analytics").get_json()["units_sold_today"] == 0
+    assert client.get(f"/api/products/{pid}").get_json()["stock"] == 2
+
+
+def test_restock_log_records_before_and_after(client):
+    pid = add(client, stock=4).get_json()["id"]
+    client.post(f"/api/products/{pid}/sell", json={"quantity": 1})
+    client.post(f"/api/products/{pid}/restock", json={"quantity": 10})
+    log = client.get("/api/restocks").get_json()[0]
+    assert (log["stock_before"], log["stock_after"]) == (3, 13)
+
+
+@pytest.mark.parametrize("payload", [
+    {"stock": 5.9}, {"stock": True}, {"stock": "abc"}, {"price": float("nan")},
+    {"price": 10 ** 9}, {"min_stock": -1},
+])
+def test_invalid_numbers_rejected(client, payload):
+    assert add(client, **payload).status_code == 400
+
+
+def test_delete_removes_related_rows(client):
+    pid = add(client, stock=10).get_json()["id"]
+    client.post(f"/api/products/{pid}/sell", json={"quantity": 2})
+    client.post(f"/api/products/{pid}/restock", json={"quantity": 3})
+    assert client.delete(f"/api/products/{pid}").status_code == 200
+    assert client.get("/api/restocks").get_json() == []
+    assert client.get("/api/products/analytics").get_json()["units_sold_today"] == 0
