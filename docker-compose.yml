@@ -1,5 +1,5 @@
 # Local environment, needs only Docker:  docker compose up --build -d
-# Dashboard: http://localhost:8080  API: http://localhost:5000/api/products
+# Everything is served on http://localhost:8080 (the dashboard proxies /api to the backend)
 services:
   db:
     image: postgres:16-alpine
@@ -22,8 +22,6 @@ services:
       DATABASE_URL: postgresql://inventory:${POSTGRES_PASSWORD:-inventory_dev_pw}@db:5432/inventory
       APP_ENV: local
       SEED_DATA: "true"
-    ports:
-      - "5000:5000"
     depends_on:
       db:
         condition: service_healthy

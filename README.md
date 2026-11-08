@@ -23,7 +23,7 @@ This is the **application repository** of the project. Infrastructure (Kubernete
 ## Architecture
 
 ```
-Browser ──► frontend (nginx :8080) ──/api──► backend (Flask :5000) ──► PostgreSQL (:5432, internal only)
+Browser ──► frontend (nginx :8080, the only published port) ──/api──► backend (Flask :5000) ──► PostgreSQL (:5432)
                                                    │
                                                    └── /metrics ──► Prometheus ──► Grafana
 ```
@@ -64,21 +64,23 @@ docker compose up --build -d
 
 This starts the database (with demo data), the API, the dashboard and the store simulator, which sells products every minute and adds a new one every two minutes. Pause it from the dashboard.
 
-| Service | URL |
+| | URL |
 |---|---|
 | Dashboard | http://localhost:8080 |
-| API | http://localhost:5000/api/products |
-| Health check | http://localhost:5000/health |
+| API | http://localhost:8080/api/products |
+| API documentation | http://localhost:8080/api/docs |
+
+Port 8080 is the only one published: the dashboard's nginx forwards `/api` to the backend, the same way the Ingress does in Kubernetes.
 
 Stop with `docker compose down`. Data persists in the `pgdata` volume.
 
-To change the local database password, copy `.env.example` to `.env` and edit it. `.env` is git-ignored.
+The local database uses a development password by default. To set your own, create a `.env` file with `POSTGRES_PASSWORD=...` before the first start (the file is git-ignored).
 
 ## Development
 
 ### Frontend
 
-The backend must be running (`docker compose up -d db backend`).
+The compose stack must be running (`docker compose up -d`); Vite forwards `/api` to it on port 8080.
 
 ```bash
 cd frontend
@@ -125,11 +127,11 @@ Tests use a temporary SQLite database, so CI does not need a PostgreSQL server.
 Example:
 
 ```bash
-curl -X POST http://localhost:5000/api/products \
+curl -X POST http://localhost:8080/api/products \
   -H "Content-Type: application/json" \
   -d '{"name":"Laptop Stand","sku":"ELC-010","stock":4,"min_stock":10,"store":"Haifa","price":129}'
 
-curl -X POST http://localhost:5000/api/products/1/restock \
+curl -X POST http://localhost:8080/api/products/1/restock \
   -H "Content-Type: application/json" \
   -d '{"quantity":25,"note":"supplier order"}'
 ```
@@ -156,6 +158,6 @@ curl -X POST http://localhost:5000/api/products/1/restock \
 ## Security notes
 
 - Containers run as non-root users on minimal base images (`slim`, `alpine`).
-- The database port is not published outside the Docker network.
-- Secrets are never committed: `.env` is git-ignored and only `.env.example` with placeholder values is tracked.
+- Only the dashboard port (8080) is published; the database and the backend are reachable only inside the Docker network.
+- Secrets are never committed: `.env` is git-ignored. In Kubernetes the database password is generated inside the cluster.
 - All SQL uses parameterized queries; API input is validated.
