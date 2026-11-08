@@ -6,7 +6,8 @@ This is the **application repository** of the project. Infrastructure (Kubernete
 
 ## For reviewers
 
-The infrastructure repository `inventory-devops` holds the Kubernetes manifests, the Jenkins pipeline and monitoring. Its README has a **requirements coverage** table that maps every item of the project brief to a file, and a one-command install (`scripts/bootstrap.sh`).
+- **See the application running:** the Quick start below needs only Docker and takes three commands.
+- **See the full DevOps system** (Kubernetes, Jenkins pipeline, Prometheus, Grafana): the `inventory-devops` repository. Its README has a one-command install and a **requirements coverage** table that maps every item of the project brief to a file.
 
 ## Tech stack
 
@@ -48,16 +49,20 @@ inventory-app/
 │   ├── vite.config.js        Vite config, /api proxy for local development
 │   ├── nginx.conf.template   Serves the build and proxies /api to the backend
 │   └── Dockerfile            Multi-stage: Node builds, nginx serves
-└── docker-compose.yml        Local environment: db + backend + frontend
+└── docker-compose.yml        Local environment: db + backend + frontend + simulator
 ```
 
 ## Quick start
 
-Requires Docker only.
+Requires Docker only (Linux, macOS or Windows).
 
 ```bash
+git clone https://github.com/nivlev20/inventory-app.git
+cd inventory-app
 docker compose up --build -d
 ```
+
+This starts the database (with demo data), the API, the dashboard and the store simulator, which sells products every minute and adds a new one every two minutes. Pause it from the dashboard.
 
 | Service | URL |
 |---|---|

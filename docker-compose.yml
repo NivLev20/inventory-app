@@ -1,9 +1,7 @@
-# Run the whole system locally with one command:
-#   docker compose up --build
-# Dashboard: http://localhost:8080      API: http://localhost:5000/api/products
+# Local environment, needs only Docker:  docker compose up --build -d
+# Dashboard: http://localhost:8080  API: http://localhost:5000/api/products
 services:
   db:
-    restart: unless-stopped
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: inventory
@@ -18,7 +16,6 @@ services:
       retries: 10
 
   backend:
-    restart: unless-stopped
     build: ./backend
     image: inventory-backend:local
     environment:
@@ -32,7 +29,6 @@ services:
         condition: service_healthy
 
   frontend:
-    restart: unless-stopped
     build: ./frontend
     image: inventory-frontend:local
     environment:
@@ -41,6 +37,29 @@ services:
       - "8080:8080"
     depends_on:
       - backend
+
+  # Store activity, like the Kubernetes CronJobs: sales every minute, a new product every 2 minutes.
+  # Pause and resume it from the dashboard.
+  simulator:
+    build: ./backend
+    image: inventory-backend:local
+    environment:
+      SIM_API_URL: http://backend:5000
+    command:
+      - sh
+      - -c
+      - |
+        sleep 20
+        i=0
+        while true; do
+          python simulator.py sales
+          [ $$((i % 2)) -eq 0 ] && python simulator.py new-product
+          i=$$((i + 1))
+          sleep 60
+        done
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
   pgdata:
