@@ -511,6 +511,7 @@ def register_metrics(app):
     from prometheus_client.core import REGISTRY
     REGISTRY.register(InventoryCollector(app))
 
+
 if __name__ == "__main__":
     # Local run: python app.py   (in Docker we use gunicorn: "app:create_app()")
     create_app().run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
